@@ -63,6 +63,28 @@ CREATE TABLE IF NOT EXISTS public.offices (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Drop any conflicting `offices` table from a previous broken run
+-- (only if the user already ran a version where id was typed as UUID).
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'offices' AND column_name = 'id' AND data_type = 'uuid'
+  ) THEN
+    DROP TABLE public.offices CASCADE;
+    CREATE TABLE public.offices (
+      id            TEXT PRIMARY KEY,
+      code          TEXT UNIQUE NOT NULL,
+      name_ar       TEXT NOT NULL,
+      governorate_ar TEXT NOT NULL,
+      lat           DOUBLE PRECISION NOT NULL,
+      lng           DOUBLE PRECISION NOT NULL,
+      is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  END IF;
+END $$;
+
 -- profiles (id matches auth.users.id 1:1)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id                  UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -351,65 +373,54 @@ INSERT INTO public.offices (id, code, name_ar, governorate_ar, lat, lng) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- 7. SEED — auth.users + profiles + user_roles
--- All demo passwords: 123456
--- We hard-code deterministic UUIDs so the app can refer to them by id.
-DO $$
-DECLARE
-  pwd TEXT := crypt('123456', gen_salt('bf'));
-  uid_director   UUID := '11111111-1111-1111-1111-111111111111';
-  uid_supervisor UUID := '22222222-2222-2222-2222-222222222222';
-  uid_manager    UUID := '33333333-3333-3333-3333-333333333331';
-  uid_manager2   UUID := '33333333-3333-3333-3333-333333333332';
-  uid_agent      UUID := '44444444-4444-4444-4444-444444444441';
-  uid_agent2     UUID := '44444444-4444-4444-4444-444444444442';
-  uid_agent3     UUID := '44444444-4444-4444-4444-444444444443';
-  rec RECORD;
-BEGIN
-  -- helper: insert one user (auth.users + profile + role) if missing
-  FOREACH rec IN ARRAY ARRAY[
-    ROW(uid_director,   'u-director@ops.iq',    'أبو علي المهداوي',     'HQ',  ARRAY['KRB','NJF','BBL','BGD','HQ','QDS','MTH','DHQ','MYS','BAS','WST','SLD','ANB','DLY','KRK'], 'director'::public.app_role, TRUE),
-    ROW(uid_supervisor, 'u-supervisor@ops.iq',  'الحاج كاظم العبيدي',   'HQ',  ARRAY['KRB','NJF','BBL','BGD','HQ'], 'supervisor'::public.app_role, TRUE),
-    ROW(uid_manager,    'u-manager@ops.iq',     'أحمد محمد الجبوري',    'KRB', ARRAY['KRB'], 'manager'::public.app_role, TRUE),
-    ROW(uid_manager2,   'u-manager2@ops.iq',    'سعد عبدالله الفتلاوي', 'NJF', ARRAY['NJF'], 'manager'::public.app_role, TRUE),
-    ROW(uid_agent,      'u-agent@ops.iq',       'محمد علي الحسناوي',    'KRB', ARRAY['KRB'], 'agent'::public.app_role, TRUE),
-    ROW(uid_agent2,     'u-agent2@ops.iq',      'علي حسين العامري',     'NJF', ARRAY['NJF'], 'agent'::public.app_role, TRUE),
-    ROW(uid_agent3,     'u-agent3@ops.iq',      'حسن كاظم البياتي',     'KRB', ARRAY['KRB'], 'agent'::public.app_role, TRUE)
-  ]
-  LOOP
-    -- auth.users
-    INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at, confirmation_token, email_change, email_change_token_new, recovery_token)
-    VALUES (
-      rec.id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-      rec.email, pwd, NOW(), jsonb_build_object('full_name_ar', rec.full_name_ar),
-      NOW(), NOW(), '', '', '', ''
-    )
-    ON CONFLICT (id) DO UPDATE SET encrypted_password = EXCLUDED.encrypted_password;
+-- All demo passwords: 123456. Hard-coded UUIDs so the app can refer to them by id.
+-- Split into 3 explicit INSERTs (auth.users, profiles, user_roles) so type
+-- inference issues with ARRAY[ROW(...)] can't poison the run.
 
-    -- profile
-    INSERT INTO public.profiles (id, full_name_ar, office_id, permitted_office_ids, special_permissions, is_active)
-    VALUES (
-      rec.id, rec.full_name_ar, rec.office_id, rec.permitted_office_ids,
-      jsonb_build_object(
-        'canExport', rec.role IN ('director','supervisor'),
-        'canAddCrossings', rec.role = 'director',
-        'canViewAllOffices', rec.role = 'director',
-        'canOpenWindow', rec.role IN ('director','supervisor'),
-        'canEditReports', rec.role = 'director'
-      ),
-      rec.is_active
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      full_name_ar = EXCLUDED.full_name_ar,
-      office_id    = EXCLUDED.office_id,
-      permitted_office_ids = EXCLUDED.permitted_office_ids,
-      special_permissions = EXCLUDED.special_permissions,
-      is_active    = EXCLUDED.is_active;
+-- 7a. auth.users (one row per demo account)
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_user_meta_data, created_at, updated_at, confirmation_token, email_change, email_change_token_new, recovery_token)
+VALUES
+  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'u-director@ops.iq',   crypt('123456', gen_salt('bf')), NOW(), '{"full_name_ar":"أبو علي المهداوي"}'::jsonb,     NOW(), NOW(), '', '', '', ''),
+  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'u-supervisor@ops.iq', crypt('123456', gen_salt('bf')), NOW(), '{"full_name_ar":"الحاج كاظم العبيدي"}'::jsonb,   NOW(), NOW(), '', '', '', ''),
+  ('33333333-3333-3333-3333-333333333331', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'u-manager@ops.iq',    crypt('123456', gen_salt('bf')), NOW(), '{"full_name_ar":"أحمد محمد الجبوري"}'::jsonb,    NOW(), NOW(), '', '', '', ''),
+  ('33333333-3333-3333-3333-333333333332', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'u-manager2@ops.iq',   crypt('123456', gen_salt('bf')), NOW(), '{"full_name_ar":"سعد عبدالله الفتلاوي"}'::jsonb, NOW(), NOW(), '', '', '', ''),
+  ('44444444-4444-4444-4444-444444444441', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'u-agent@ops.iq',      crypt('123456', gen_salt('bf')), NOW(), '{"full_name_ar":"محمد علي الحسناوي"}'::jsonb,    NOW(), NOW(), '', '', '', ''),
+  ('44444444-4444-4444-4444-444444444442', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'u-agent2@ops.iq',     crypt('123456', gen_salt('bf')), NOW(), '{"full_name_ar":"علي حسين العامري"}'::jsonb,     NOW(), NOW(), '', '', '', ''),
+  ('44444444-4444-4444-4444-444444444443', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'u-agent3@ops.iq',     crypt('123456', gen_salt('bf')), NOW(), '{"full_name_ar":"حسن كاظم البياتي"}'::jsonb,     NOW(), NOW(), '', '', '', '')
+ON CONFLICT (id) DO UPDATE SET
+  encrypted_password = EXCLUDED.encrypted_password,
+  email_confirmed_at = EXCLUDED.email_confirmed_at,
+  raw_user_meta_data = EXCLUDED.raw_user_meta_data,
+  updated_at = NOW();
 
-    -- user_roles
-    INSERT INTO public.user_roles (user_id, role) VALUES (rec.id, rec.role)
-      ON CONFLICT (user_id, role) DO NOTHING;
-  END LOOP;
-END $$;
+-- 7b. profiles (one row per demo account)
+INSERT INTO public.profiles (id, full_name_ar, office_id, permitted_office_ids, special_permissions, is_active)
+VALUES
+  ('11111111-1111-1111-1111-111111111111'::uuid, 'أبو علي المهداوي',     'HQ'::text, ARRAY['KRB','NJF','BBL','BGD','HQ','QDS','MTH','DHQ','MYS','BAS','WST','SLD','ANB','DLY','KRK']::text[], '{"canExport":true,"canAddCrossings":true,"canViewAllOffices":true,"canOpenWindow":true,"canEditReports":true}'::jsonb,  TRUE),
+  ('22222222-2222-2222-2222-222222222222'::uuid, 'الحاج كاظم العبيدي',   'HQ'::text, ARRAY['KRB','NJF','BBL','BGD','HQ']::text[],                                                                                                                                                '{"canExport":true,"canAddCrossings":false,"canViewAllOffices":false,"canOpenWindow":true,"canEditReports":false}'::jsonb, TRUE),
+  ('33333333-3333-3333-3333-333333333331'::uuid, 'أحمد محمد الجبوري',    'KRB'::text, ARRAY['KRB']::text[],                                                                                                                                                                  '{"canExport":false,"canAddCrossings":false,"canViewAllOffices":false,"canOpenWindow":false,"canEditReports":false}'::jsonb, TRUE),
+  ('33333333-3333-3333-3333-333333333332'::uuid, 'سعد عبدالله الفتلاوي', 'NJF'::text, ARRAY['NJF']::text[],                                                                                                                                                                  '{"canExport":false,"canAddCrossings":false,"canViewAllOffices":false,"canOpenWindow":false,"canEditReports":false}'::jsonb, TRUE),
+  ('44444444-4444-4444-4444-444444444441'::uuid, 'محمد علي الحسناوي',    'KRB'::text, ARRAY['KRB']::text[],                                                                                                                                                                  '{"canExport":false,"canAddCrossings":false,"canViewAllOffices":false,"canOpenWindow":false,"canEditReports":false}'::jsonb, TRUE),
+  ('44444444-4444-4444-4444-444444444442'::uuid, 'علي حسين العامري',     'NJF'::text, ARRAY['NJF']::text[],                                                                                                                                                                  '{"canExport":false,"canAddCrossings":false,"canViewAllOffices":false,"canOpenWindow":false,"canEditReports":false}'::jsonb, TRUE),
+  ('44444444-4444-4444-4444-444444444443'::uuid, 'حسن كاظم البياتي',     'KRB'::text, ARRAY['KRB']::text[],                                                                                                                                                                  '{"canExport":false,"canAddCrossings":false,"canViewAllOffices":false,"canOpenWindow":false,"canEditReports":false}'::jsonb, TRUE)
+ON CONFLICT (id) DO UPDATE SET
+  full_name_ar        = EXCLUDED.full_name_ar,
+  office_id           = EXCLUDED.office_id,
+  permitted_office_ids = EXCLUDED.permitted_office_ids,
+  special_permissions = EXCLUDED.special_permissions,
+  is_active           = EXCLUDED.is_active,
+  updated_at          = NOW();
+
+-- 7c. user_roles (one row per demo account)
+INSERT INTO public.user_roles (user_id, role) VALUES
+  ('11111111-1111-1111-1111-111111111111'::uuid, 'director'::public.app_role),
+  ('22222222-2222-2222-2222-222222222222'::uuid, 'supervisor'::public.app_role),
+  ('33333333-3333-3333-3333-333333333331'::uuid, 'manager'::public.app_role),
+  ('33333333-3333-3333-3333-333333333332'::uuid, 'manager'::public.app_role),
+  ('44444444-4444-4444-4444-444444444441'::uuid, 'agent'::public.app_role),
+  ('44444444-4444-4444-4444-444444444442'::uuid, 'agent'::public.app_role),
+  ('44444444-4444-4444-4444-444444444443'::uuid, 'agent'::public.app_role)
+ON CONFLICT (user_id, role) DO NOTHING;
 
 -- 8. SEED — time_windows singleton
 INSERT INTO public.time_windows (id, window_date, open_time, close_time, is_manually_open, is_manually_closed)
