@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           accuracy_meters: number | null
           agent_id: string
+          agent_name: string
           id: string
           lat: number
           lng: number
@@ -27,6 +28,7 @@ export type Database = {
         Insert: {
           accuracy_meters?: number | null
           agent_id: string
+          agent_name?: string
           id?: string
           lat: number
           lng: number
@@ -36,6 +38,7 @@ export type Database = {
         Update: {
           accuracy_meters?: number | null
           agent_id?: string
+          agent_name?: string
           id?: string
           lat?: number
           lng?: number
@@ -254,6 +257,7 @@ export type Database = {
         Row: {
           acknowledged_at: string | null
           acknowledged_by: string | null
+          acknowledged_by_name: string | null
           created_at: string
           description: string
           emergency_type: string
@@ -263,12 +267,14 @@ export type Database = {
           location_mgrs: string | null
           office_id: string
           reported_by: string
+          reported_by_name: string
           resolved_at: string | null
           status: string
         }
         Insert: {
           acknowledged_at?: string | null
           acknowledged_by?: string | null
+          acknowledged_by_name?: string | null
           created_at?: string
           description: string
           emergency_type: string
@@ -278,12 +284,14 @@ export type Database = {
           location_mgrs?: string | null
           office_id: string
           reported_by: string
+          reported_by_name?: string
           resolved_at?: string | null
           status?: string
         }
         Update: {
           acknowledged_at?: string | null
           acknowledged_by?: string | null
+          acknowledged_by_name?: string | null
           created_at?: string
           description?: string
           emergency_type?: string
@@ -293,6 +301,7 @@ export type Database = {
           location_mgrs?: string | null
           office_id?: string
           reported_by?: string
+          reported_by_name?: string
           resolved_at?: string | null
           status?: string
         }
@@ -327,13 +336,16 @@ export type Database = {
           id: string
           manager_reviewed_at: string | null
           manager_reviewed_by: string | null
+          manager_reviewed_by_name: string | null
           office_id: string
           reason: string | null
           request_time: string
           requested_by: string
+          requested_by_name: string
           status: string
           supervisor_approved_at: string | null
           supervisor_approved_by: string | null
+          supervisor_approved_by_name: string | null
         }
         Insert: {
           created_at?: string
@@ -341,13 +353,16 @@ export type Database = {
           id?: string
           manager_reviewed_at?: string | null
           manager_reviewed_by?: string | null
+          manager_reviewed_by_name?: string | null
           office_id: string
           reason?: string | null
           request_time?: string
           requested_by: string
+          requested_by_name?: string
           status?: string
           supervisor_approved_at?: string | null
           supervisor_approved_by?: string | null
+          supervisor_approved_by_name?: string | null
         }
         Update: {
           created_at?: string
@@ -355,13 +370,16 @@ export type Database = {
           id?: string
           manager_reviewed_at?: string | null
           manager_reviewed_by?: string | null
+          manager_reviewed_by_name?: string | null
           office_id?: string
           reason?: string | null
           request_time?: string
           requested_by?: string
+          requested_by_name?: string
           status?: string
           supervisor_approved_at?: string | null
           supervisor_approved_by?: string | null
+          supervisor_approved_by_name?: string | null
         }
         Relationships: [
           {
