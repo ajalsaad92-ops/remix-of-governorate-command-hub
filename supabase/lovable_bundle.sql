@@ -367,6 +367,13 @@ BEGIN
   ) THEN
     ALTER TABLE public.profiles ALTER COLUMN office_id TYPE TEXT USING office_id::text;
   END IF;
+  -- permitted_office_ids must be TEXT[] (array of office codes), not UUID[]
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'permitted_office_ids' AND data_type = 'ARRAY' AND udt_name = '_uuid'
+  ) THEN
+    ALTER TABLE public.profiles ALTER COLUMN permitted_office_ids TYPE TEXT[] USING ARRAY(SELECT x::text FROM unnest(permitted_office_ids) AS x);
+  END IF;
 END $$;
 
 -- daily_reports
