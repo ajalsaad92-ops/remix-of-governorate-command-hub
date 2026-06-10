@@ -55,6 +55,13 @@ export default function SupervisorPanelPage() {
     report: state.todayReports.find(r => r.officeId === o.id),
   }));
 
+  // H1: scope visible extensions to the user's permitted offices so a
+  // manager doesn't see (and get confused by) requests from other offices
+  // they can't act on. Directors still see everything.
+  const visibleExtensions = isDirector
+    ? state.extensions
+    : state.extensions.filter(ex => permittedIds.includes(ex.officeId));
+
   return (
     <div className="h-full overflow-y-auto bg-[#0B0F19] p-3 md:p-5">
       <div className="max-w-6xl mx-auto space-y-4">
@@ -116,14 +123,14 @@ export default function SupervisorPanelPage() {
         <div className="bg-[#111827] border border-[#1E293B] rounded-xl p-4">
           <div className="text-sm font-bold text-amber-400 mb-3 flex items-center gap-2">
             <Timer className="w-4 h-4" /> طلبات التمديد
-            {state.extensions.length > 0 && <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">{state.extensions.length}</span>}
+            {visibleExtensions.length > 0 && <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">{visibleExtensions.length}</span>}
           </div>
 
-          {state.extensions.length === 0 ? (
+          {visibleExtensions.length === 0 ? (
             <div className="text-center py-8 text-slate-500 text-sm">لا توجد طلبات تمديد حالياً</div>
           ) : (
             <div className="space-y-2">
-              {state.extensions.map(ex => {
+              {visibleExtensions.map(ex => {
                 const isOwnOffice = ex.officeId === user.officeId;
                 const canReviewAsManager = user.role === 'manager' && isOwnOffice && ex.status === 'pending';
                 const canReviewAsSupervisor = isDirector || (user.role === 'supervisor' && permittedIds.includes(ex.officeId) && ex.status === 'forwarded_to_supervisor');

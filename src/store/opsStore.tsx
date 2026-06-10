@@ -4,6 +4,8 @@ import type {
   AgentLocation, VisitorFlowPath, TimeWindow, TimeWindowStatus,
 } from '../data/types';
 import { api } from '../lib/api';
+import { isSupabaseConfigured } from '../integrations/supabase/client';
+import EnvErrorPage from '../pages/EnvErrorPage';
 
 interface OpsState {
   // Auth
@@ -316,6 +318,21 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
+  // H4: refresh timeWindow.date at midnight so reports submitted after 00:00
+  // don't get tagged with yesterday's date. Runs every 60s and compares the
+  // current YYYY-MM-DD against the one in state; updates only if changed.
+  useEffect(() => {
+    const rollIfNewDay = async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      if (today !== state.timeWindow.windowDate) {
+        const tw = await api.getTimeWindow();
+        dispatch({ type: 'SET_TIME_WINDOW', window: { ...tw, windowDate: today } });
+      }
+    };
+    const id = setInterval(rollIfNewDay, 60_000);
+    return () => clearInterval(id);
+  }, [state.timeWindow.windowDate]);
+
   // Live subscriptions (mimic Supabase realtime)
   useEffect(() => {
     const unsub = api.subscribe((event) => {
@@ -383,6 +400,12 @@ export function OpsProvider({ children }: { children: ReactNode }) {
         </div>
       </div>
     );
+  }
+
+  // C1: show clear env-var error instead of an infinite spinner when the
+  // project is missing Supabase config.
+  if (!isSupabaseConfigured) {
+    return <EnvErrorPage />;
   }
 
   return <OpsContext.Provider value={{ state, dispatch, actions }}>{children}</OpsContext.Provider>;

@@ -4,6 +4,7 @@ import { useOps } from '../store/opsStore';
 import { Bell, ChevronLeft, LayoutDashboard, FileText, AlertOctagon, History, Users, Timer, LogOut, Hexagon, Radio } from 'lucide-react';
 import TimeLockBar from './TimeLockBar';
 import EmergencyBanner from './EmergencyBanner';
+import { OFFICES } from '../data/offices';
 import { toast } from 'sonner';
 
 const roleLabels = {
@@ -149,7 +150,7 @@ export default function AppShell() {
           <div className="hidden md:flex items-center gap-1 text-[10px] text-slate-600" title="عدد المكاتب التي أرسلت تقرير اليوم">
             <span className="text-emerald-400 font-bold">{state.todayReports.length}</span>
             <span>/</span>
-            <span>15</span>
+            <span>{OFFICES.length}</span>
             <span>مكتب</span>
           </div>
 

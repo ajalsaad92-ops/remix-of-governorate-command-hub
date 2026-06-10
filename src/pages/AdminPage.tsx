@@ -28,8 +28,7 @@ const PERMS = [
 ];
 
 export default function AdminPage() {
-  const { state } = useOps();
-  const { actions } = useOps();
+  const { state, dispatch, actions } = useOps();
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Profile | null>(null);
   const [creating, setCreating] = useState(false);
@@ -54,13 +53,20 @@ export default function AdminPage() {
     if (!draft.officeId) return toast.error('المكتب مطلوب');
     try {
       if (creating) {
-        await api.signUp({
+        const { user: newUser, error: signUpErr } = await api.signUp({
           fullNameAr: draft.fullNameAr!,
           email: `${draft.fullNameAr?.replace(/\s+/g, '.').toLowerCase()}.${Date.now()}@ops.iq`,
           password: '123456',
           role: draft.role as Role,
           officeId: draft.officeId!,
         });
+        if (signUpErr || !newUser) {
+          toast.error(signUpErr || 'فشل إنشاء المستخدم');
+          return;
+        }
+        // M2: dispatch ADD_USER so the new row appears in the list immediately
+        // without waiting for a refresh or a Realtime round-trip.
+        dispatch({ type: 'ADD_USER', user: newUser });
         toast.success('تم إنشاء المستخدم بنجاح — كلمة المرور الافتراضية: 123456');
       } else if (editing) {
         await actions.updateUser(editing.id, draft);
@@ -94,10 +100,14 @@ export default function AdminPage() {
   const seedData = async () => {
     const t = toast.loading('جاري تحميل البيانات التجريبية...');
     try {
-      const { added } = await actions.seedDemoData();
-      toast.success(`🌱 تم تحميل ${added} تقرير تجريبي بنجاح`, { id: t });
-    } catch {
-      toast.error('فشل تحميل البيانات', { id: t });
+      const result = await actions.seedDemoData();
+      if (result?.error) {
+        toast.error(result.error, { id: t });
+      } else {
+        toast.success(`🌱 تم تحميل ${result.added} تقرير تجريبي بنجاح`, { id: t });
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'فشل تحميل البيانات', { id: t });
     }
   };
 

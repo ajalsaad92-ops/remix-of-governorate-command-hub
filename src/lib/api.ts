@@ -457,6 +457,19 @@ export const api = {
   },
 
   async insertExtension(ex: ExtensionRequest): Promise<ExtensionRequest> {
+    // M5: pre-check for an open request from the same office to avoid
+    // double-clicks and network retries producing duplicate rows. The
+    // SQL partial unique index in lovable_bundle.sql is the authoritative
+    // backstop; this is a friendly client-side guard.
+    const { data: existing } = await supabase
+      .from('extension_requests')
+      .select('id, status')
+      .eq('office_id', ex.officeId)
+      .in('status', ['pending', 'forwarded_to_supervisor', 'approved'])
+      .maybeSingle();
+    if (existing) {
+      throw new Error('يوجد طلب تمديد مفتوح مسبقاً لهذا المكتب');
+    }
     const { data, error } = await supabase
       .from('extension_requests')
       .insert({
@@ -470,7 +483,12 @@ export const api = {
       })
       .select('*')
       .single();
-    if (error) throw error;
+    if (error) {
+      // Treat Postgres unique-violation as a duplicate (race condition between
+      // the pre-check above and the insert) and surface a friendly message.
+      if (error.code === '23505') throw new Error('يوجد طلب تمديد مفتوح مسبقاً لهذا المكتب');
+      throw error;
+    }
     return rowToExtension(data);
   },
 
@@ -607,14 +625,15 @@ export const api = {
   },
 
   // ─── Seed (director "load demo data" button) ────────────────────
-  async seedDemoData(): Promise<{ added: number }> {
+  async seedDemoData(): Promise<{ added: number; error?: string }> {
     // Insert ~30 days × ~15 offices of historical reports. Done client-side in
     // a single batched upsert so the director doesn't have to wait forever.
     const offices = ['HQ','BGD','KRB','NJF','BBL','QDS','MTH','DHQ','MYS','BAS','WST','SLD','ANB','DLY','KRK'];
     const rng = (() => { let s = 1234567; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; })();
     const rows: any[] = [];
     const submittedBy = (await supabase.auth.getUser()).data.user?.id;
-    if (!submittedBy) return { added: 0 };
+    // H3: surface the failure mode (no session) instead of silently returning 0
+    if (!submittedBy) return { added: 0, error: 'الجلسة منتهية — أعد تسجيل الدخول ثم حاول مرة أخرى' };
     for (let dOff = 30; dOff > 14; dOff--) {
       const dt = new Date(); dt.setDate(dt.getDate() - dOff);
       const dateStr = dt.toISOString().slice(0, 10);
@@ -663,7 +682,7 @@ export const api = {
     const { error } = await supabase
       .from('daily_reports')
       .upsert(rows, { onConflict: 'office_id,report_date' });
-    if (error) { console.warn('[api] seedDemoData', error.message); return { added: 0 }; }
+    if (error) return { added: 0, error: error.message };
     return { added: rows.length };
   },
 
