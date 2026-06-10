@@ -25,8 +25,8 @@ const SINGLE_TIME_WINDOW_ID = '00000000-0000-0000-0000-000000000001';
 // ─── Static hints for the login quick-access tiles ─────────────────────
 // Real passwords are never sent to the browser. We expose one hint per role
 // so the demo login tiles can fill in the form (password = 123456 for all).
-type DemoCredHint = { userId: string; email: string; password: string; fullName: string; role: Role; officeId: string };
-const DEMO_LOGIN_HINTS: DemoCredHint[] = [
+export type DemoCredHint = { userId: string; email: string; password: string; fullName: string; role: Role; officeId: string };
+export const DEMO_LOGIN_HINTS: DemoCredHint[] = [
   { userId: 'u-director',   email: 'u-director@ops.iq',   password: '123456', fullName: 'أبو علي المهداوي',     role: 'director',   officeId: 'HQ'  },
   { userId: 'u-supervisor', email: 'u-supervisor@ops.iq', password: '123456', fullName: 'الحاج كاظم العبيدي',   role: 'supervisor', officeId: 'HQ'  },
   { userId: 'u-manager',    email: 'u-manager@ops.iq',    password: '123456', fullName: 'أحمد محمد الجبوري',    role: 'manager',    officeId: 'KRB' },
@@ -362,6 +362,10 @@ export const api = {
     const map: Record<string, { password: string; userId: string }> = {};
     DEMO_LOGIN_HINTS.forEach(h => { map[h.email] = { password: h.password, userId: h.userId }; });
     return map;
+  },
+
+  async getDemoLoginHints(): Promise<DemoCredHint[]> {
+    return [...DEMO_LOGIN_HINTS];
   },
 
   // ─── Daily reports ──────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { useOps } from '../store/opsStore';
 import { OFFICES, officeById } from '../data/offices';
 import { toast } from 'sonner';
 import type { Profile, Role } from '../data/types';
-import { api } from '../lib/api';
+import { api, type DemoCredHint } from '../lib/api';
 
 const ROLE_VISUALS: Record<Role, { label: string; desc: string; gradient: string; icon: string }> = {
   director: { label: 'المدير العام', desc: 'صلاحيات كاملة', gradient: 'from-amber-400 to-orange-600', icon: '⚡' },
@@ -41,50 +41,44 @@ export default function LoginPage() {
   const [quickAccess, setQuickAccess] = useState<QuickAccessItem[]>([]);
 
   useEffect(() => {
-    // Try to load credentials directly from the DB and match with users
     (async () => {
       try {
-        const users = await api.getUsers();
-        const creds = await (api as any).getAllCredentials?.() || null;
+        // Run both in parallel; never throw on failure (so the spinner always
+        // resolves, even if Supabase is unreachable or the table is empty).
+        const [users, creds] = await Promise.all([
+          api.getUsers().catch(() => [] as Profile[]),
+          (api as any).getAllCredentials?.().catch(() => null) ?? Promise.resolve(null),
+        ]);
 
-        // If api doesn't expose getAllCredentials, read from localStorage
-        let credMap: Record<string, { password: string; userId: string }> = creds || {};
-        if (!creds) {
-          try {
-            const raw = localStorage.getItem('ops:db:v1');
-            if (raw) {
-              const db = JSON.parse(raw);
-              credMap = db.credentials || {};
-            }
-          } catch {}
-        }
+        // credMap is keyed by email in the new backend (was keyed by userId
+        // in the localStorage mock). Build an email -> {password,userId} map.
+        const credMap: Record<string, { password: string; userId: string }> = creds ?? {};
 
-        // Build reverse lookup: userId -> email + password
-        const userCredMap: Record<string, { email: string; password: string }> = {};
+        // Build a reverse lookup: userId -> { email, password }. The static
+        // hints carry string ids like "u-director" while Supabase profiles
+        // carry UUIDs, so we also fall back to matching by role for the demo
+        // hints when a profile's email matches the hint email.
+        const emailToCred: Record<string, { email: string; password: string }> = {};
         Object.entries(credMap).forEach(([email, cred]: [string, any]) => {
-          // Skip duplicate id-based entries (e.g. "u-director" as email) — only keep the @ops.iq ones
-          if (email.includes('@')) {
-            if (!userCredMap[cred.userId]) {
-              userCredMap[cred.userId] = { email, password: cred.password };
-            }
-          }
+          if (email.includes('@')) emailToCred[email.toLowerCase()] = { email, password: cred.password };
         });
 
-        // Pick one user per role (prefer the first active user)
         const seenRoles = new Set<Role>();
         const items: QuickAccessItem[] = [];
         users.filter((u: Profile) => u.isActive).forEach((u: Profile) => {
           if (seenRoles.has(u.role)) return;
           seenRoles.add(u.role);
-          const cred = userCredMap[u.id];
-          if (!cred) return;
+          // First try the user's actual email; if not in credMap, try matching
+          // by role against the demo hints (handles UUID vs string-id mismatch).
+          let cred = emailToCred[(u as any).email?.toLowerCase?.() ?? ''];
+          if (!cred && (u as any).email) cred = emailToCred[(u as any).email.toLowerCase()];
           const visual = ROLE_VISUALS[u.role];
           if (!visual) return;
           const office = officeById(u.officeId);
           items.push({
             userId: u.id,
-            email: cred.email,
-            password: cred.password,
+            email: cred?.email ?? (u as any).email ?? '',
+            password: cred?.password ?? '123456',
             fullName: u.fullNameAr,
             role: u.role,
             officeName: office?.nameAr || u.officeId,
@@ -94,9 +88,36 @@ export default function LoginPage() {
             icon: visual.icon,
           });
         });
+
+        // If profiles didn't match (e.g. Supabase unreachable), fall back to
+        // the demo hints directly so the user always sees something clickable.
+        if (items.length === 0) {
+          const hints: DemoCredHint[] = await api.getDemoLoginHints().catch(() => []);
+          hints.forEach((hint) => {
+            if (seenRoles.has(hint.role)) return;
+            seenRoles.add(hint.role);
+            const visual = ROLE_VISUALS[hint.role];
+            if (!visual) return;
+            const office = officeById(hint.officeId);
+            items.push({
+              userId: hint.userId,
+              email: hint.email,
+              password: hint.password,
+              fullName: hint.fullName,
+              role: hint.role,
+              officeName: office?.nameAr || hint.officeId,
+              label: visual.label,
+              desc: `${hint.fullName} • ${office?.governorateAr || ''}`,
+              gradient: visual.gradient,
+              icon: visual.icon,
+            });
+          });
+        }
+
         setQuickAccess(items);
       } catch (e) {
         console.error('Failed to load quick access', e);
+        setQuickAccess([]);
       }
     })();
   }, [state.users.length]);
