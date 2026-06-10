@@ -353,6 +353,109 @@ CREATE POLICY "border_crossings update"
   ON public.border_crossings FOR UPDATE
   USING (public.is_director_or_supervisor(auth.uid()));
 
+-- 6. SCHEMA REPAIR — coerce any pre-existing table to the column types
+-- this bundle expects. Each block is a no-op when the table is already
+-- correct, so re-runs are safe. This handles projects that already have
+-- a partial schema from a prior run.
+
+-- profiles.office_id must be TEXT
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'office_id' AND data_type = 'uuid'
+  ) THEN
+    ALTER TABLE public.profiles ALTER COLUMN office_id TYPE TEXT USING office_id::text;
+  END IF;
+END $$;
+
+-- daily_reports
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='daily_reports' AND column_name='office_id' AND data_type='uuid') THEN
+    ALTER TABLE public.daily_reports ALTER COLUMN office_id TYPE TEXT USING office_id::text;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='daily_reports' AND column_name='submitted_by' AND data_type='text') THEN
+    ALTER TABLE public.daily_reports ALTER COLUMN submitted_by TYPE UUID USING submitted_by::uuid;
+  END IF;
+END $$;
+
+-- emergencies
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='emergencies' AND column_name='office_id' AND data_type='uuid') THEN
+    ALTER TABLE public.emergencies ALTER COLUMN office_id TYPE TEXT USING office_id::text;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='emergencies' AND column_name='reported_by' AND data_type='text') THEN
+    ALTER TABLE public.emergencies ALTER COLUMN reported_by TYPE UUID USING reported_by::uuid;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='emergencies' AND column_name='acknowledged_by' AND data_type='text') THEN
+    ALTER TABLE public.emergencies ALTER COLUMN acknowledged_by TYPE UUID USING NULLIF(acknowledged_by, '')::uuid;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='emergencies' AND column_name='reported_by_name') THEN
+    ALTER TABLE public.emergencies ADD COLUMN reported_by_name TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='emergencies' AND column_name='acknowledged_by_name') THEN
+    ALTER TABLE public.emergencies ADD COLUMN acknowledged_by_name TEXT;
+  END IF;
+END $$;
+
+-- extension_requests
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='extension_requests' AND column_name='office_id' AND data_type='uuid') THEN
+    ALTER TABLE public.extension_requests ALTER COLUMN office_id TYPE TEXT USING office_id::text;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='extension_requests' AND column_name='requested_by' AND data_type='text') THEN
+    ALTER TABLE public.extension_requests ALTER COLUMN requested_by TYPE UUID USING requested_by::uuid;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='extension_requests' AND column_name='manager_reviewed_by' AND data_type='text') THEN
+    ALTER TABLE public.extension_requests ALTER COLUMN manager_reviewed_by TYPE UUID USING NULLIF(manager_reviewed_by, '')::uuid;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='extension_requests' AND column_name='supervisor_approved_by' AND data_type='text') THEN
+    ALTER TABLE public.extension_requests ALTER COLUMN supervisor_approved_by TYPE UUID USING NULLIF(supervisor_approved_by, '')::uuid;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='extension_requests' AND column_name='requested_by_name') THEN
+    ALTER TABLE public.extension_requests ADD COLUMN requested_by_name TEXT NOT NULL DEFAULT '';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='extension_requests' AND column_name='manager_reviewed_by_name') THEN
+    ALTER TABLE public.extension_requests ADD COLUMN manager_reviewed_by_name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='extension_requests' AND column_name='supervisor_approved_by_name') THEN
+    ALTER TABLE public.extension_requests ADD COLUMN supervisor_approved_by_name TEXT;
+  END IF;
+END $$;
+
+-- agent_locations
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='agent_locations' AND column_name='office_id' AND data_type='uuid') THEN
+    ALTER TABLE public.agent_locations ALTER COLUMN office_id TYPE TEXT USING office_id::text;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='agent_locations' AND column_name='agent_id' AND data_type='text') THEN
+    ALTER TABLE public.agent_locations ALTER COLUMN agent_id TYPE UUID USING agent_id::uuid;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='agent_locations' AND column_name='agent_name') THEN
+    ALTER TABLE public.agent_locations ADD COLUMN agent_name TEXT NOT NULL DEFAULT '';
+  END IF;
+END $$;
+
+-- visitor_flow_paths
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='visitor_flow_paths' AND column_name='office_id' AND data_type='uuid') THEN
+    ALTER TABLE public.visitor_flow_paths ALTER COLUMN office_id TYPE TEXT USING office_id::text;
+  END IF;
+END $$;
+
+-- border_crossings
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='border_crossings' AND column_name='nearest_office_id' AND data_type='uuid') THEN
+    ALTER TABLE public.border_crossings ALTER COLUMN nearest_office_id TYPE TEXT USING nearest_office_id::text;
+  END IF;
+END $$;
+
 -- 6. SEED — offices (idempotent)
 INSERT INTO public.offices (id, code, name_ar, governorate_ar, lat, lng) VALUES
   ('HQ',  'HQ',  'مقر المديرية',         'بغداد',         33.3152, 44.3661),
