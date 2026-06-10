@@ -180,14 +180,20 @@ CREATE INDEX IF NOT EXISTS idx_emergencies_office ON public.emergencies (office_
 -- M5: a partial unique index prevents two open extension requests from
 -- the same office at the same time. The status filter excludes resolved/
 -- rejected rows so a fresh request can always be opened later.
--- First delete any pre-existing duplicates (keep the newest per office),
--- otherwise the unique index creation will fail with 23505.
+-- First delete any pre-existing duplicates (keep one per office), otherwise
+-- the unique index creation will fail with 23505. Use id as a tiebreaker
+-- because seeded rows often share the same created_at to the microsecond.
 DELETE FROM public.extension_requests a
-USING public.extension_requests b
-WHERE a.office_id = b.office_id
+USING (
+  SELECT office_id, MAX(id) AS keep_id
+  FROM public.extension_requests
+  WHERE status IN ('pending', 'forwarded_to_supervisor', 'approved')
+  GROUP BY office_id
+  HAVING COUNT(*) > 1
+) k
+WHERE a.office_id = k.office_id
   AND a.status IN ('pending', 'forwarded_to_supervisor', 'approved')
-  AND b.status IN ('pending', 'forwarded_to_supervisor', 'approved')
-  AND a.created_at < b.created_at;
+  AND a.id <> k.keep_id;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_extension_one_open_per_office
   ON public.extension_requests (office_id)

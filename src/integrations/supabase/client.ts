@@ -2,16 +2,25 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Read the Supabase URL and key from whichever env var the host provides.
+// Lovable Cloud / connected Supabase → SUPABASE_URL + SUPABASE_ANON_KEY
+// (no VITE_ prefix, reserved and auto-populated by Lovable).
+// Plain Vite / external repo → VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY
+// (or the older VITE_SUPABASE_ANON_KEY name for backward compat).
+const env = import.meta.env as Record<string, string | undefined>;
+const SUPABASE_URL =
+  env.VITE_SUPABASE_URL || env.SUPABASE_URL || '';
+const SUPABASE_KEY =
+  env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  env.VITE_SUPABASE_ANON_KEY ||
+  env.SUPABASE_ANON_KEY ||
+  env.SUPABASE_PUBLISHABLE_KEY ||
+  '';
 
-export const isSupabaseConfigured = !!SUPABASE_URL && !!SUPABASE_PUBLISHABLE_KEY;
+export const isSupabaseConfigured = !!SUPABASE_URL && !!SUPABASE_KEY;
 
-// Use a placeholder URL when unconfigured so createClient() doesn't throw at
-// import time. All api.ts methods check isConfigured() and return early;
-// OpsProvider shows EnvErrorPage if not configured.
 const safeUrl = SUPABASE_URL || 'http://localhost:0';
-const safeKey = SUPABASE_PUBLISHABLE_KEY || 'unconfigured';
+const safeKey = SUPABASE_KEY || 'unconfigured';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
