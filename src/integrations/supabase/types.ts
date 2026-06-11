@@ -53,13 +53,6 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "agent_locations_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
-            referencedColumns: ["id"]
-          },
         ]
       }
       border_crossings: {
@@ -99,15 +92,7 @@ export type Database = {
           nearest_office_id?: string | null
           neighboring_country_ar?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "border_crossings_nearest_office_id_fkey"
-            columns: ["nearest_office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       daily_reports: {
         Row: {
@@ -238,13 +223,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "daily_reports_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "daily_reports_submitted_by_fkey"
             columns: ["submitted_by"]
             isOneToOne: false
@@ -311,13 +289,6 @@ export type Database = {
             columns: ["acknowledged_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "emergencies_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
             referencedColumns: ["id"]
           },
           {
@@ -390,13 +361,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "extension_requests_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "extension_requests_requested_by_fkey"
             columns: ["requested_by"]
             isOneToOne: false
@@ -427,7 +391,7 @@ export type Database = {
           code: string
           created_at?: string
           governorate_ar: string
-          id?: string
+          id: string
           is_active?: boolean
           lat: number
           lng: number
@@ -476,15 +440,7 @@ export type Database = {
           special_permissions?: Json
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       time_windows: {
         Row: {
@@ -587,13 +543,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "visitor_flow_paths_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "visitor_flow_paths_report_id_fkey"
             columns: ["report_id"]
             isOneToOne: false
@@ -607,13 +556,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      current_user_office_id: { Args: never; Returns: string }
+      has_role:
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
       is_director_or_supervisor: {
         Args: { _user_id: string }
         Returns: boolean
