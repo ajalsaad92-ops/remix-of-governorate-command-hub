@@ -55,47 +55,6 @@ export type Database = {
           },
         ]
       }
-      audit_logs: {
-        Row: {
-          action: string
-          created_at: string | null
-          id: string
-          new_data: Json | null
-          old_data: Json | null
-          record_id: string | null
-          table_name: string
-          user_id: string | null
-        }
-        Insert: {
-          action: string
-          created_at?: string | null
-          id?: string
-          new_data?: Json | null
-          old_data?: Json | null
-          record_id?: string | null
-          table_name: string
-          user_id?: string | null
-        }
-        Update: {
-          action?: string
-          created_at?: string | null
-          id?: string
-          new_data?: Json | null
-          old_data?: Json | null
-          record_id?: string | null
-          table_name?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       border_crossings: {
         Row: {
           created_at: string
@@ -132,27 +91,6 @@ export type Database = {
           name_ar?: string
           nearest_office_id?: string | null
           neighboring_country_ar?: string | null
-        }
-        Relationships: []
-      }
-      categories: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name?: string
         }
         Relationships: []
       }
@@ -504,60 +442,6 @@ export type Database = {
         }
         Relationships: []
       }
-      records: {
-        Row: {
-          category_id: string | null
-          created_at: string | null
-          created_by: string | null
-          full_name: string
-          id: string
-          national_id: string
-          notes: string | null
-          phone: string | null
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          category_id?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          full_name: string
-          id?: string
-          national_id: string
-          notes?: string | null
-          phone?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          category_id?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          full_name?: string
-          id?: string
-          national_id?: string
-          notes?: string | null
-          phone?: string | null
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "records_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "records_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       time_windows: {
         Row: {
           close_time: string
@@ -617,36 +501,6 @@ export type Database = {
         }
         Relationships: []
       }
-      users: {
-        Row: {
-          created_at: string | null
-          full_name: string | null
-          id: string
-          password: string
-          role: string
-          updated_at: string | null
-          username: string
-        }
-        Insert: {
-          created_at?: string | null
-          full_name?: string | null
-          id?: string
-          password: string
-          role?: string
-          updated_at?: string | null
-          username: string
-        }
-        Update: {
-          created_at?: string | null
-          full_name?: string | null
-          id?: string
-          password?: string
-          role?: string
-          updated_at?: string | null
-          username?: string
-        }
-        Relationships: []
-      }
       visitor_flow_paths: {
         Row: {
           density: string
@@ -702,6 +556,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_office_id: { Args: never; Returns: string }
       has_role:
         | {
             Args: {
