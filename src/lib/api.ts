@@ -688,15 +688,34 @@ export const api = {
 
   // ─── Subscriptions (Supabase Realtime) ──────────────────────────
   subscribe(fn: (event: { type: string; table: string; payload: any }) => void): () => void {
+    // Realtime delivers RAW database rows (snake_case). Map them to the typed
+    // shapes the reducer expects so newly-inserted reports/emergencies/etc.
+    // show up live in the dashboard instead of arriving in the wrong shape.
+    const mapRow = (table: string, row: any) => {
+      if (!row) return row;
+      switch (table) {
+        case 'daily_reports':      return rowToReport(row);
+        case 'emergencies':        return rowToEmergency(row);
+        case 'extension_requests': return rowToExtension(row);
+        case 'agent_locations':    return rowToAgentLocation(row);
+        case 'time_windows':       return rowToTimeWindow(row);
+        default:                   return row;
+      }
+    };
+    const emit = (table: string) => (p: any) => fn({
+      type: p.eventType,
+      table,
+      payload: { new: mapRow(table, p.new), old: mapRow(table, p.old) },
+    });
     const ch = supabase
       .channel('ops:realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_reports' },      (p) => fn({ type: p.eventType, table: 'daily_reports',       payload: { new: p.new, old: p.old } }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'emergencies' },        (p) => fn({ type: p.eventType, table: 'emergencies',         payload: { new: p.new, old: p.old } }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'extension_requests' }, (p) => fn({ type: p.eventType, table: 'extension_requests',  payload: { new: p.new, old: p.old } }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_windows' },       (p) => fn({ type: p.eventType, table: 'time_windows',        payload: { new: p.new, old: p.old } }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_locations' },    (p) => fn({ type: p.eventType, table: 'agent_locations',     payload: { new: p.new, old: p.old } }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'border_crossings' },   (p) => fn({ type: p.eventType, table: 'border_crossings',    payload: { new: p.new, old: p.old } }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' },           (p) => fn({ type: p.eventType, table: 'profiles',            payload: { new: p.new, old: p.old } }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_reports' },      emit('daily_reports'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'emergencies' },        emit('emergencies'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'extension_requests' }, emit('extension_requests'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_windows' },       emit('time_windows'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_locations' },    emit('agent_locations'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'border_crossings' },   emit('border_crossings'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' },           emit('profiles'))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   },
