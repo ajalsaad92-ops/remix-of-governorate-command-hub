@@ -53,11 +53,45 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string | null
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
           {
-            foreignKeyName: "agent_locations_office_id_fkey"
-            columns: ["office_id"]
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "offices"
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -99,15 +133,28 @@ export type Database = {
           nearest_office_id?: string | null
           neighboring_country_ar?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "border_crossings_nearest_office_id_fkey"
-            columns: ["nearest_office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
+      }
+      categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       daily_reports: {
         Row: {
@@ -238,13 +285,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "daily_reports_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "daily_reports_submitted_by_fkey"
             columns: ["submitted_by"]
             isOneToOne: false
@@ -311,13 +351,6 @@ export type Database = {
             columns: ["acknowledged_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "emergencies_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
             referencedColumns: ["id"]
           },
           {
@@ -390,13 +423,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "extension_requests_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "extension_requests_requested_by_fkey"
             columns: ["requested_by"]
             isOneToOne: false
@@ -427,7 +453,7 @@ export type Database = {
           code: string
           created_at?: string
           governorate_ar: string
-          id?: string
+          id: string
           is_active?: boolean
           lat: number
           lng: number
@@ -476,12 +502,58 @@ export type Database = {
           special_permissions?: Json
           updated_at?: string
         }
+        Relationships: []
+      }
+      records: {
+        Row: {
+          category_id: string | null
+          created_at: string | null
+          created_by: string | null
+          full_name: string
+          id: string
+          national_id: string
+          notes: string | null
+          phone: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          full_name: string
+          id?: string
+          national_id: string
+          notes?: string | null
+          phone?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          full_name?: string
+          id?: string
+          national_id?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
         Relationships: [
           {
-            foreignKeyName: "profiles_office_id_fkey"
-            columns: ["office_id"]
+            foreignKeyName: "records_category_id_fkey"
+            columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: "offices"
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "records_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -545,6 +617,36 @@ export type Database = {
         }
         Relationships: []
       }
+      users: {
+        Row: {
+          created_at: string | null
+          full_name: string | null
+          id: string
+          password: string
+          role: string
+          updated_at: string | null
+          username: string
+        }
+        Insert: {
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          password: string
+          role?: string
+          updated_at?: string | null
+          username: string
+        }
+        Update: {
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          password?: string
+          role?: string
+          updated_at?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
       visitor_flow_paths: {
         Row: {
           density: string
@@ -587,13 +689,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "visitor_flow_paths_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "offices"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "visitor_flow_paths_report_id_fkey"
             columns: ["report_id"]
             isOneToOne: false
@@ -607,13 +702,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      has_role:
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
       is_director_or_supervisor: {
         Args: { _user_id: string }
         Returns: boolean
