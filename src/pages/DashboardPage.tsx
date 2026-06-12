@@ -822,13 +822,15 @@ function DrillDownPanel({ office, onClose }: { office: Office; onClose: () => vo
 function CustomKpiGrid({ agg, aggYesterday, trend, activeEmergencies, cols = 3 }: any) {
   const { state } = useOps();
   const ids = state.customKpis;
+  const catalog = getEffectiveKpiCatalog(state.fieldDefinitions);
+  const byId = (id: string) => catalog.find(k => k.id === id);
   const valFor = (id: string) => id === 'emergencies' ? activeEmergencies : (agg as any)[id] || 0;
   const yestFor = (id: string) => id === 'emergencies' ? activeEmergencies : (aggYesterday as any)[id] || 0;
   const colsCls = cols === 4 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3';
   return (
     <div className={`grid ${colsCls} gap-3`}>
       {ids.map((id: string) => {
-        const def = kpiById(id);
+        const def = byId(id);
         if (!def) return null;
         return (
           <KpiCard
@@ -852,6 +854,8 @@ function CustomKpiGrid({ agg, aggYesterday, trend, activeEmergencies, cols = 3 }
 function OpsKpiOverlay({ agg, activeEmergencies }: any) {
   const { state } = useOps();
   const ids = state.customKpis;
+  const catalog = getEffectiveKpiCatalog(state.fieldDefinitions);
+  const byId = (id: string) => catalog.find(k => k.id === id);
   const toneClass: Record<string, string> = {
     amber: 'from-amber-400 to-orange-600',
     blue: 'from-blue-400 to-indigo-600',
@@ -868,7 +872,7 @@ function OpsKpiOverlay({ agg, activeEmergencies }: any) {
   return (
     <>
       {ids.map((id: string) => {
-        const def = kpiById(id);
+        const def = byId(id);
         if (!def) return null;
         const v = id === 'emergencies' ? activeEmergencies : (agg as any)[id] || 0;
         const isEmergency = id === 'emergencies' && v > 0;
@@ -930,5 +934,3 @@ function SmartInsightsTicker({ insights }: { insights: ReturnType<typeof buildIn
   );
 }
 
-// Reference unused imports for type safety
-void KPI_CATALOG;
