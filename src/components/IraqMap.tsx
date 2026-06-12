@@ -242,56 +242,92 @@ export default function IraqMap({ onSelectOffice, selectedOfficeId, height = '10
           attribution='&copy; OpenStreetMap contributors &copy; CARTO'
         />
 
-        {/* Mask: everything outside Iraq is hidden behind a white overlay
-            so the visible map appears to contain Iraq alone. */}
+        {/* Mask: world rectangle with official Iraq ADM0 outline as a hole.
+            Everything outside Iraq is hidden behind a white overlay so only
+            Iraqi territory shows the underlying basemap tiles. */}
         <Polygon
-          positions={[WORLD_MASK_OUTER, IRAQ_OUTLINE]}
+          positions={MASK_RINGS}
           pathOptions={{
-            color: '#94A3B8',
-            weight: 1.5,
+            color: '#64748B',
+            weight: 2,
             fillColor: '#ffffff',
             fillOpacity: 1,
             interactive: false,
           }}
         />
 
-        {/* Iraq governorate polygons */}
-        {IRAQ_GOVERNORATES.map(gov => {
-          const isKurdistan = KURDISTAN_CODES.includes(gov.code);
-          const isHover = hoveredGov === gov.code;
-          const officeHere = OFFICES.find(o => o.id === gov.code);
+        {/* Official governorate boundaries (geoBoundaries ADM1). */}
+        {((iraqAdm1 as any).features as any[]).map((feat) => {
+          const iso = feat.properties.shapeISO as string;
+          const code = ISO_TO_CODE[iso];
+          if (!code) return null;
+          const isKurdistan = KURDISTAN_CODES.includes(code);
+          const isHover = hoveredGov === code;
+          const officeHere = OFFICES.find(o => o.id === code);
           const isSelected = officeHere && selectedOfficeId === officeHere.id;
+
+          // Convert GeoJSON [lng,lat] → Leaflet [lat,lng] rings.
+          const geom = feat.geometry;
+          const positions: [number, number][][] | [number, number][][][] =
+            geom.type === 'Polygon'
+              ? (geom.coordinates as any[]).map((ring: any[]) =>
+                  ring.map((c: any) => [c[1], c[0]] as [number, number])
+                )
+              : (geom.coordinates as any[]).map((poly: any[]) =>
+                  poly.map((ring: any[]) =>
+                    ring.map((c: any) => [c[1], c[0]] as [number, number])
+                  )
+                );
 
           return (
             <Polygon
-              key={gov.code}
-              positions={gov.polygon}
+              key={iso}
+              positions={positions as any}
               eventHandlers={{
-                mouseover: () => setHoveredGov(gov.code),
+                mouseover: () => setHoveredGov(code),
                 mouseout: () => setHoveredGov(null),
                 click: () => {
-                  if (officeHere && !isKurdistan) {
-                    onSelectOffice?.(officeHere);
-                  }
+                  if (officeHere && !isKurdistan) onSelectOffice?.(officeHere);
                 },
               }}
               pathOptions={{
-                color: isKurdistan ? '#6B7280' : isSelected ? '#D97706' : isHover ? '#F59E0B' : '#475569',
-                weight: isSelected ? 2.5 : isHover ? 2 : 1.2,
-                fillColor: isKurdistan ? '#E5E7EB' : governorateColor[gov.code] || '#F1F5F9',
-                fillOpacity: isKurdistan ? 0.55 : isSelected ? 0.55 : isHover ? 0.5 : 0.35,
+                color: isKurdistan ? '#6B7280' : isSelected ? '#D97706' : isHover ? '#F59E0B' : '#64748B',
+                weight: isSelected ? 2.5 : isHover ? 2 : 1.1,
+                fillColor: isKurdistan ? '#E5E7EB' : PROVINCE_FILL[code] || '#F1F5F9',
+                fillOpacity: isKurdistan ? 0.45 : isSelected ? 0.55 : isHover ? 0.5 : 0.32,
                 dashArray: isKurdistan ? '6, 4' : undefined,
               }}
             />
           );
         })}
 
-        {/* Kurdistan label */}
-        <Marker position={[36.5, 45.2]} icon={L.divIcon({
+        {/* Province name labels at centroids. */}
+        {((iraqAdm1 as any).features as any[]).map((feat) => {
+          const iso = feat.properties.shapeISO as string;
+          const code = ISO_TO_CODE[iso];
+          if (!code) return null;
+          const [lat, lng] = geometryCentroid(feat.geometry);
+          return (
+            <Marker
+              key={`label-${iso}`}
+              position={[lat, lng]}
+              interactive={false}
+              icon={L.divIcon({
+                className: 'gov-label',
+                html: `<div style="color:#1E293B; font-family:Cairo; font-size:10px; font-weight:700; text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; white-space:nowrap; pointer-events:none;">${NAMES_AR[code] || code}</div>`,
+                iconSize: [80, 14],
+                iconAnchor: [40, 7],
+              })}
+            />
+          );
+        })}
+
+        {/* Kurdistan region label */}
+        <Marker position={[36.7, 44.6]} icon={L.divIcon({
           className: 'kurdistan-label',
-          html: '<div style="color:#475569; font-family:Cairo; font-size:11px; font-weight:700; text-shadow:0 1px 2px #fff; white-space:nowrap;">إقليم كوردستان</div>',
-          iconSize: [120, 16],
-          iconAnchor: [60, 8],
+          html: '<div style="color:#475569; font-family:Cairo; font-size:11px; font-weight:800; letter-spacing:1px; text-shadow:0 0 4px #fff, 0 0 4px #fff; white-space:nowrap; opacity:0.7;">إقليم كوردستان</div>',
+          iconSize: [140, 16],
+          iconAnchor: [70, 8],
         })} interactive={false} />
 
         {/* Office markers */}
