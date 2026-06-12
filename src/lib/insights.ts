@@ -16,7 +16,7 @@ export function buildInsights(
   todayReports: DailyReport[],
   historicalReports: DailyReport[],
   emergencies: Emergency[],
-  users: Profile[],
+  _users: Profile[],
 ): Insight[] {
   const out: Insight[] = [];
   const yest = new Date(); yest.setDate(yest.getDate() - 1);
