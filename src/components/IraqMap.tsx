@@ -2,10 +2,36 @@ import { useEffect, useRef, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, Polyline, Circle, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { OFFICES } from '../data/offices';
-import { IRAQ_GOVERNORATES, KURDISTAN_CODES, IRAQ_OUTLINE, WORLD_MASK_OUTER } from '../data/iraqGeo';
+import { KURDISTAN_CODES } from '../data/iraqGeo';
+import iraqAdm1 from '../data/iraq-adm1.json';
+import iraqAdm0 from '../data/iraq-adm0.json';
 import { useOps } from '../store/opsStore';
 import { officeById } from '../data/offices';
 import type { Office } from '../data/offices';
+
+// ─── Province ISO ↔ internal office code mapping ───
+const ISO_TO_CODE: Record<string, string> = {
+  'IQ-AN': 'ANB', 'IQ-KA': 'KRB', 'IQ-NA': 'NJF', 'IQ-BB': 'BBL',
+  'IQ-BG': 'BGD', 'IQ-QA': 'QDS', 'IQ-MU': 'MTH', 'IQ-DQ': 'DHQ',
+  'IQ-BA': 'BAS', 'IQ-MA': 'MYS', 'IQ-WA': 'WST', 'IQ-NI': 'NIN',
+  'IQ-DA': 'DOH', 'IQ-SD': 'SLD', 'IQ-DI': 'DLY', 'IQ-KI': 'KRK',
+  'IQ-AR': 'ERB', 'IQ-SU': 'SUL',
+};
+const NAMES_AR: Record<string, string> = {
+  ANB: 'الأنبار', KRB: 'كربلاء', NJF: 'النجف', BBL: 'بابل',
+  BGD: 'بغداد', QDS: 'القادسية', MTH: 'المثنى', DHQ: 'ذي قار',
+  BAS: 'البصرة', MYS: 'ميسان', WST: 'واسط', NIN: 'نينوى',
+  DOH: 'دهوك', SLD: 'صلاح الدين', DLY: 'ديالى', KRK: 'كركوك',
+  ERB: 'أربيل', SUL: 'السليمانية',
+};
+
+// Subtle per-province tints over the white basemap
+const PROVINCE_FILL: Record<string, string> = {
+  NIN: '#DBEAFE', SLD: '#D1FAE5', ANB: '#FFEDD5', BGD: '#FEF3C7',
+  DLY: '#FEE2E2', KRK: '#EDE9FE', ERB: '#E5E7EB', SUL: '#E5E7EB', DOH: '#E5E7EB',
+  WST: '#CFFAFE', KRB: '#FCE7F3', NJF: '#ECFCCB', BBL: '#FBCFE8',
+  QDS: '#FEF9C3', MTH: '#EDE9FE', DHQ: '#FFEDD5', MYS: '#D1FAE5', BAS: '#FECACA',
+};
 
 // Fix Leaflet default icon path issues with Vite
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -16,23 +42,52 @@ L.Icon.Default.mergeOptions({
 });
 
 const MAP_CONFIG = {
-  center: [32.5, 44.0] as [number, number],
+  center: [33.2, 43.7] as [number, number],
   zoom: 6,
   minZoom: 5,
-  maxZoom: 12,
-  // Iraq bounds only - tighter bounds
-  maxBounds: [[29.0, 38.5], [37.5, 49.0]] as [[number, number], [number, number]],
-  maxBoundsViscosity: 1.0, // Strict bounds
+  maxZoom: 14,
+  maxBounds: [[28.5, 37.5], [38.0, 49.5]] as [[number, number], [number, number]],
+  maxBoundsViscosity: 1.0,
 };
 
-const governorateColor: Record<string, string> = {
-  // Light, subtle tints over the white basemap so each governorate is
-  // distinguishable without overpowering the street layer underneath.
-  NIN: '#DBEAFE', SLD: '#D1FAE5', ANB: '#FFEDD5', BGD: '#FEF3C7',
-  DLY: '#FEE2E2', KRK: '#EDE9FE', ERB: '#E5E7EB', SUL: '#E5E7EB', DOH: '#E5E7EB',
-  WST: '#CFFAFE', KRB: '#FCE7F3', NJF: '#ECFCCB', BBL: '#FBCFE8',
-  QDS: '#FEF9C3', MTH: '#EDE9FE', DHQ: '#FFEDD5', MYS: '#D1FAE5', BAS: '#FECACA',
-};
+// ─── Build mask: world rectangle with Iraq cut out ───
+// Iraq ADM0 GeoJSON polygons (lat/lng pairs are [lng,lat] in GeoJSON)
+function buildMaskRings(): [number, number][][] {
+  const outer: [number, number][] = [
+    [10, 20], [10, 70], [55, 70], [55, 20], [10, 20],
+  ];
+  const rings: [number, number][][] = [outer];
+  const geom: any = (iraqAdm0 as any).features[0].geometry;
+  const pushRing = (coords: any[]) => {
+    rings.push(coords.map((c: any) => [c[1], c[0]] as [number, number]));
+  };
+  if (geom.type === 'Polygon') {
+    pushRing(geom.coordinates[0]);
+  } else if (geom.type === 'MultiPolygon') {
+    geom.coordinates.forEach((poly: any) => pushRing(poly[0]));
+  }
+  return rings;
+}
+const MASK_RINGS = buildMaskRings();
+
+// Province centroid (for label placement)
+function ringCentroid(ring: [number, number][]): [number, number] {
+  let lat = 0, lng = 0;
+  for (const p of ring) { lat += p[0]; lng += p[1]; }
+  return [lat / ring.length, lng / ring.length];
+}
+function geometryCentroid(geom: any): [number, number] {
+  if (geom.type === 'Polygon') {
+    return ringCentroid(geom.coordinates[0].map((c: any) => [c[1], c[0]]));
+  }
+  // MultiPolygon — use the largest ring
+  const polys = geom.coordinates as any[];
+  let bestSize = 0, best: any = polys[0][0];
+  for (const poly of polys) {
+    if (poly[0].length > bestSize) { bestSize = poly[0].length; best = poly[0]; }
+  }
+  return ringCentroid(best.map((c: any) => [c[1], c[0]]));
+}
 
 // Hexagonal amber SVG marker for offices
 function createOfficeIcon(submitted: boolean, selected: boolean, kurdistan: boolean): L.DivIcon {
@@ -187,56 +242,92 @@ export default function IraqMap({ onSelectOffice, selectedOfficeId, height = '10
           attribution='&copy; OpenStreetMap contributors &copy; CARTO'
         />
 
-        {/* Mask: everything outside Iraq is hidden behind a white overlay
-            so the visible map appears to contain Iraq alone. */}
+        {/* Mask: world rectangle with official Iraq ADM0 outline as a hole.
+            Everything outside Iraq is hidden behind a white overlay so only
+            Iraqi territory shows the underlying basemap tiles. */}
         <Polygon
-          positions={[WORLD_MASK_OUTER, IRAQ_OUTLINE]}
+          positions={MASK_RINGS}
           pathOptions={{
-            color: '#94A3B8',
-            weight: 1.5,
+            color: '#64748B',
+            weight: 2,
             fillColor: '#ffffff',
             fillOpacity: 1,
             interactive: false,
           }}
         />
 
-        {/* Iraq governorate polygons */}
-        {IRAQ_GOVERNORATES.map(gov => {
-          const isKurdistan = KURDISTAN_CODES.includes(gov.code);
-          const isHover = hoveredGov === gov.code;
-          const officeHere = OFFICES.find(o => o.id === gov.code);
+        {/* Official governorate boundaries (geoBoundaries ADM1). */}
+        {((iraqAdm1 as any).features as any[]).map((feat) => {
+          const iso = feat.properties.shapeISO as string;
+          const code = ISO_TO_CODE[iso];
+          if (!code) return null;
+          const isKurdistan = KURDISTAN_CODES.includes(code);
+          const isHover = hoveredGov === code;
+          const officeHere = OFFICES.find(o => o.id === code);
           const isSelected = officeHere && selectedOfficeId === officeHere.id;
+
+          // Convert GeoJSON [lng,lat] → Leaflet [lat,lng] rings.
+          const geom = feat.geometry;
+          const positions: [number, number][][] | [number, number][][][] =
+            geom.type === 'Polygon'
+              ? (geom.coordinates as any[]).map((ring: any[]) =>
+                  ring.map((c: any) => [c[1], c[0]] as [number, number])
+                )
+              : (geom.coordinates as any[]).map((poly: any[]) =>
+                  poly.map((ring: any[]) =>
+                    ring.map((c: any) => [c[1], c[0]] as [number, number])
+                  )
+                );
 
           return (
             <Polygon
-              key={gov.code}
-              positions={gov.polygon}
+              key={iso}
+              positions={positions as any}
               eventHandlers={{
-                mouseover: () => setHoveredGov(gov.code),
+                mouseover: () => setHoveredGov(code),
                 mouseout: () => setHoveredGov(null),
                 click: () => {
-                  if (officeHere && !isKurdistan) {
-                    onSelectOffice?.(officeHere);
-                  }
+                  if (officeHere && !isKurdistan) onSelectOffice?.(officeHere);
                 },
               }}
               pathOptions={{
-                color: isKurdistan ? '#6B7280' : isSelected ? '#D97706' : isHover ? '#F59E0B' : '#475569',
-                weight: isSelected ? 2.5 : isHover ? 2 : 1.2,
-                fillColor: isKurdistan ? '#E5E7EB' : governorateColor[gov.code] || '#F1F5F9',
-                fillOpacity: isKurdistan ? 0.55 : isSelected ? 0.55 : isHover ? 0.5 : 0.35,
+                color: isKurdistan ? '#6B7280' : isSelected ? '#D97706' : isHover ? '#F59E0B' : '#64748B',
+                weight: isSelected ? 2.5 : isHover ? 2 : 1.1,
+                fillColor: isKurdistan ? '#E5E7EB' : PROVINCE_FILL[code] || '#F1F5F9',
+                fillOpacity: isKurdistan ? 0.45 : isSelected ? 0.55 : isHover ? 0.5 : 0.32,
                 dashArray: isKurdistan ? '6, 4' : undefined,
               }}
             />
           );
         })}
 
-        {/* Kurdistan label */}
-        <Marker position={[36.5, 45.2]} icon={L.divIcon({
+        {/* Province name labels at centroids. */}
+        {((iraqAdm1 as any).features as any[]).map((feat) => {
+          const iso = feat.properties.shapeISO as string;
+          const code = ISO_TO_CODE[iso];
+          if (!code) return null;
+          const [lat, lng] = geometryCentroid(feat.geometry);
+          return (
+            <Marker
+              key={`label-${iso}`}
+              position={[lat, lng]}
+              interactive={false}
+              icon={L.divIcon({
+                className: 'gov-label',
+                html: `<div style="color:#1E293B; font-family:Cairo; font-size:10px; font-weight:700; text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; white-space:nowrap; pointer-events:none;">${NAMES_AR[code] || code}</div>`,
+                iconSize: [80, 14],
+                iconAnchor: [40, 7],
+              })}
+            />
+          );
+        })}
+
+        {/* Kurdistan region label */}
+        <Marker position={[36.7, 44.6]} icon={L.divIcon({
           className: 'kurdistan-label',
-          html: '<div style="color:#475569; font-family:Cairo; font-size:11px; font-weight:700; text-shadow:0 1px 2px #fff; white-space:nowrap;">إقليم كوردستان</div>',
-          iconSize: [120, 16],
-          iconAnchor: [60, 8],
+          html: '<div style="color:#475569; font-family:Cairo; font-size:11px; font-weight:800; letter-spacing:1px; text-shadow:0 0 4px #fff, 0 0 4px #fff; white-space:nowrap; opacity:0.7;">إقليم كوردستان</div>',
+          iconSize: [140, 16],
+          iconAnchor: [70, 8],
         })} interactive={false} />
 
         {/* Office markers */}

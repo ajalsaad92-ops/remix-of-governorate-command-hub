@@ -406,7 +406,7 @@ function OpsView({ agg, effectiveFilter, selectedOffice, setSelectedOffice, acti
       )}
 
       {/* Layer control (right) */}
-      <MapLayerControl position="right" variant="vertical" />
+      <MapLayerControl position="left" variant="vertical" />
 
       {/* Map */}
       <IraqMap
@@ -444,6 +444,9 @@ function OpsView({ agg, effectiveFilter, selectedOffice, setSelectedOffice, acti
 // ════════════════════════════════════════════════════════════════
 function AnalyticsView({ agg, trend, aggYesterday, effectiveFilter, selectedOffice, setSelectedOffice }: any) {
   const { state } = useOps();
+
+  const hasAnyData =
+    state.todayReports.length > 0 || state.historicalReports.length > 0;
 
   const sparklineFor = (key: keyof typeof agg) => {
     const days: number[] = [];
@@ -485,6 +488,21 @@ function AnalyticsView({ agg, trend, aggYesterday, effectiveFilter, selectedOffi
 
   return (
     <div className="h-full overflow-y-auto p-3 space-y-3">
+      {!hasAnyData && (
+        <div className="bg-gradient-to-l from-amber-500/10 to-amber-500/5 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+          <AlertOctagon className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="text-sm font-bold text-amber-300 mb-1">لا توجد بيانات للتحليل بعد</div>
+            <div className="text-xs text-slate-400 leading-relaxed">
+              لم يتم استلام أي تقارير يومية أو تاريخية حتى الآن. ستظهر جميع المؤشرات والرسوم البيانية أدناه فور إدخال أول تقرير من المكاتب الميدانية.
+            </div>
+            <div className="text-[10px] text-slate-500 mt-2">
+              المكاتب المسموح بها: {effectiveFilter.length} مكتب • التقارير اليوم: 0 • تقارير تاريخية: 0
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Row 1: Hero KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <KpiCard label="الزوار التراكمي" value={agg.visitors} icon={Users} size="lg" trend={trend(agg.visitors, aggYesterday.visitors)} sparklineData={sparklineFor('visitors')} borderGlow tone="amber" />
