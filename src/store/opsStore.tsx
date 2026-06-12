@@ -31,6 +31,9 @@ interface OpsState {
   selectedOfficeId: string | null;
   activeMapLayers: Set<string>;
   officeFilter: string[];
+  visibleProvinces: Set<string>; // empty = show all
+  customKpis: string[]; // ordered list of KPI ids visible in dashboards
+  dateRange: { from: string; to: string } | null; // null = cumulative-today
   unreadNotifications: number;
   lastActivity: { id: string; type: 'report' | 'emergency' | 'extension' | 'system'; text: string; officeId?: string; createdAt: string }[];
 
@@ -61,6 +64,10 @@ type Action =
   | { type: 'SELECT_OFFICE'; id: string | null }
   | { type: 'TOGGLE_LAYER'; layer: string }
   | { type: 'SET_OFFICE_FILTER'; ids: string[] }
+  | { type: 'TOGGLE_PROVINCE'; code: string }
+  | { type: 'SET_PROVINCES'; codes: string[] }
+  | { type: 'SET_CUSTOM_KPIS'; ids: string[] }
+  | { type: 'SET_DATE_RANGE'; range: { from: string; to: string } | null }
   | { type: 'ADD_USER'; user: Profile }
   | { type: 'UPDATE_USER'; id: string; patch: Partial<Profile> }
   | { type: 'ADD_BORDER_CROSSING'; crossing: any }
@@ -86,6 +93,14 @@ const initialState: OpsState = {
   selectedOfficeId: null,
   activeMapLayers: new Set(['offices', 'borderCrossings', 'agentGPS']),
   officeFilter: [],
+  visibleProvinces: new Set(),
+  customKpis: (() => {
+    try {
+      const v = typeof localStorage !== 'undefined' ? localStorage.getItem('ops:customKpis') : null;
+      return v ? JSON.parse(v) : ['visitors', 'vehicles', 'processions', 'emergencies'];
+    } catch { return ['visitors', 'vehicles', 'processions', 'emergencies']; }
+  })(),
+  dateRange: null,
   unreadNotifications: 0,
   lastActivity: [],
   loadingFlags: {},
@@ -198,6 +213,20 @@ function reducer(state: OpsState, action: Action): OpsState {
     }
     case 'SET_OFFICE_FILTER':
       return { ...state, officeFilter: action.ids };
+    case 'TOGGLE_PROVINCE': {
+      const next = new Set(state.visibleProvinces);
+      if (next.has(action.code)) next.delete(action.code);
+      else next.add(action.code);
+      return { ...state, visibleProvinces: next };
+    }
+    case 'SET_PROVINCES':
+      return { ...state, visibleProvinces: new Set(action.codes) };
+    case 'SET_CUSTOM_KPIS': {
+      try { localStorage.setItem('ops:customKpis', JSON.stringify(action.ids)); } catch {}
+      return { ...state, customKpis: action.ids };
+    }
+    case 'SET_DATE_RANGE':
+      return { ...state, dateRange: action.range };
     case 'ADD_USER':
       return { ...state, users: [...state.users, action.user] };
     case 'UPDATE_USER':

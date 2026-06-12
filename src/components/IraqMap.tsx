@@ -190,11 +190,17 @@ export default function IraqMap({ onSelectOffice, selectedOfficeId, height = '10
   const { state } = useOps();
   const officeIconCache = useRef<Map<string, L.DivIcon>>(new Map());
   const [hoveredGov, setHoveredGov] = useState<string | null>(null);
+  const visibleProvinces = state.visibleProvinces;
+  const provinceFiltered = visibleProvinces.size > 0;
+  const isVisibleProv = (code: string) => !provinceFiltered || visibleProvinces.has(code);
 
   const visibleOffices = useMemo(() => {
-    if (!filterOfficeIds || filterOfficeIds.length === 0) return OFFICES;
-    return OFFICES.filter(o => filterOfficeIds.includes(o.id));
-  }, [filterOfficeIds]);
+    let list = (!filterOfficeIds || filterOfficeIds.length === 0) ? OFFICES : OFFICES.filter(o => filterOfficeIds.includes(o.id));
+    if (provinceFiltered) {
+      list = list.filter(o => visibleProvinces.has(o.id) || (o.id === 'HQ' && visibleProvinces.has('BGD')));
+    }
+    return list;
+  }, [filterOfficeIds, provinceFiltered, visibleProvinces]);
 
   const submittedOfficeIds = useMemo(() =>
     new Set(state.todayReports.map(r => r.officeId)),
@@ -262,6 +268,7 @@ export default function IraqMap({ onSelectOffice, selectedOfficeId, height = '10
           const code = ISO_TO_CODE[iso];
           if (!code) return null;
           const isKurdistan = KURDISTAN_CODES.includes(code);
+          const dimmed = provinceFiltered && !isVisibleProv(code);
           const isHover = hoveredGov === code;
           const officeHere = OFFICES.find(o => o.id === code);
           const isSelected = officeHere && selectedOfficeId === officeHere.id;
@@ -291,10 +298,10 @@ export default function IraqMap({ onSelectOffice, selectedOfficeId, height = '10
                 },
               }}
               pathOptions={{
-                color: isKurdistan ? '#6B7280' : isSelected ? '#D97706' : isHover ? '#F59E0B' : '#64748B',
-                weight: isSelected ? 2.5 : isHover ? 2 : 1.1,
-                fillColor: isKurdistan ? '#E5E7EB' : PROVINCE_FILL[code] || '#F1F5F9',
-                fillOpacity: isKurdistan ? 0.45 : isSelected ? 0.55 : isHover ? 0.5 : 0.32,
+                color: dimmed ? '#CBD5E1' : isKurdistan ? '#6B7280' : isSelected ? '#D97706' : isHover ? '#F59E0B' : '#64748B',
+                weight: dimmed ? 0.5 : isSelected ? 2.5 : isHover ? 2 : 1.1,
+                fillColor: dimmed ? '#FFFFFF' : isKurdistan ? '#E5E7EB' : PROVINCE_FILL[code] || '#F1F5F9',
+                fillOpacity: dimmed ? 0.92 : isKurdistan ? 0.45 : isSelected ? 0.55 : isHover ? 0.5 : 0.32,
                 dashArray: isKurdistan ? '6, 4' : undefined,
               }}
             />
@@ -306,6 +313,7 @@ export default function IraqMap({ onSelectOffice, selectedOfficeId, height = '10
           const iso = feat.properties.shapeISO as string;
           const code = ISO_TO_CODE[iso];
           if (!code) return null;
+          if (provinceFiltered && !visibleProvinces.has(code)) return null;
           const [lat, lng] = geometryCentroid(feat.geometry);
           return (
             <Marker

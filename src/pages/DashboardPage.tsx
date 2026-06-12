@@ -5,9 +5,13 @@ import { OFFICES, officeById } from '../data/offices';
 import KpiCard from '../components/KpiCard';
 import IraqMap from '../components/IraqMap';
 import MapLayerControl from '../components/MapLayerControl';
+import KpiCustomizer from '../components/KpiCustomizer';
+import DateRangeFilter from '../components/DateRangeFilter';
+import { KPI_CATALOG, kpiById } from '../lib/kpiCatalog';
+import { buildInsights } from '../lib/insights';
 import {
-  Users, Truck, Flag, AlertOctagon, BarChart3, Map, Activity,
-  Award, Check, Clock, X, Timer, Search, Download, Plus
+  Users, Truck, AlertOctagon, BarChart3, Map, Activity,
+  Award, Check, Clock, X, Timer, Search, Download, Plus, TrendingUp, TrendingDown, Star, Info, ZapOff, Package
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area, Legend, CartesianGrid } from 'recharts';
 import { formatNumber, formatFullNumber, relativeTime } from '../lib/utils';
@@ -48,12 +52,34 @@ export default function DashboardPage() {
   const effectiveFilter = state.officeFilter.length === 0 ? permittedIds :
     state.officeFilter.filter(id => permittedIds.includes(id));
 
-  const aggToday = useMemo(() => computeAggregates(state.todayReports, effectiveFilter), [state.todayReports, effectiveFilter]);
-  const aggYesterday = useMemo(() => {
-    const yest = new Date(); yest.setDate(yest.getDate() - 1);
-    const yestStr = yest.toISOString().slice(0, 10);
-    return computeAggregates(state.historicalReports.filter(r => r.reportDate === yestStr), effectiveFilter);
-  }, [state.historicalReports, effectiveFilter]);
+  // Apply date-range when set; else use today (cumulative-today behavior).
+  const { aggToday, aggYesterday, rangeLabel } = useMemo(() => {
+    const dr = state.dateRange;
+    if (!dr) {
+      const yest = new Date(); yest.setDate(yest.getDate() - 1);
+      const yestStr = yest.toISOString().slice(0, 10);
+      return {
+        aggToday: computeAggregates(state.todayReports, effectiveFilter),
+        aggYesterday: computeAggregates(state.historicalReports.filter(r => r.reportDate === yestStr), effectiveFilter),
+        rangeLabel: 'اليوم',
+      };
+    }
+    const all = [...state.historicalReports, ...state.todayReports];
+    const inRange = all.filter(r => r.reportDate >= dr.from && r.reportDate <= dr.to);
+    // Previous equal-length window for trend
+    const fromD = new Date(dr.from), toD = new Date(dr.to);
+    const days = Math.max(1, Math.round((toD.getTime() - fromD.getTime()) / 86400000) + 1);
+    const prevTo = new Date(fromD); prevTo.setDate(prevTo.getDate() - 1);
+    const prevFrom = new Date(prevTo); prevFrom.setDate(prevFrom.getDate() - (days - 1));
+    const prevFromStr = prevFrom.toISOString().slice(0, 10);
+    const prevToStr = prevTo.toISOString().slice(0, 10);
+    const prev = all.filter(r => r.reportDate >= prevFromStr && r.reportDate <= prevToStr);
+    return {
+      aggToday: computeAggregates(inRange, effectiveFilter),
+      aggYesterday: computeAggregates(prev, effectiveFilter),
+      rangeLabel: dr.from === dr.to ? dr.from : `${dr.from} → ${dr.to}`,
+    };
+  }, [state.dateRange, state.todayReports, state.historicalReports, effectiveFilter]);
 
   const trend = (today: number, yest: number) => yest === 0 ? 0 : ((today - yest) / yest) * 100;
   const activeEmergencies = state.emergencies.filter(e => e.status === 'active').length;
@@ -142,7 +168,12 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {user.role !== 'agent' && <DateRangeFilter />}
+        {user.role !== 'agent' && <KpiCustomizer />}
+
         <div className="text-xs text-slate-500 hidden md:flex items-center gap-1">
+          <span>•</span>
+          <span className="text-amber-400 font-bold">{rangeLabel}</span>
           <span>•</span>
           <span>آخر تحديث: {state.serverTime.toLocaleTimeString('en-GB', { hour12: false })}</span>
         </div>
@@ -195,12 +226,8 @@ function CommandView({ agg, trend, aggYesterday, effectiveFilter, selectedOffice
     <div className="h-full flex flex-col lg:flex-row gap-3 p-3 overflow-hidden">
       {/* Left 45% */}
       <div className="lg:w-[45%] flex flex-col gap-3 overflow-y-auto">
-        {/* Top KPIs */}
-        <div className="grid grid-cols-3 gap-3">
-          <KpiCard label="إجمالي الزوار" value={agg.visitors} icon={Users} trend={trend(agg.visitors, aggYesterday.visitors)} borderGlow tone="amber" />
-          <KpiCard label="حركة العجلات" value={agg.vehicles} icon={Truck} trend={trend(agg.vehicles, aggYesterday.vehicles)} tone="blue" />
-          <KpiCard label="المواكب" value={agg.processions} icon={Flag} trend={trend(agg.processions, aggYesterday.processions)} tone="emerald" />
-        </div>
+        {/* Top KPIs — driven by customKpis */}
+        <CustomKpiGrid agg={agg} aggYesterday={aggYesterday} trend={trend} activeEmergencies={activeEmergencies} cols={3} />
 
         {/* Charts */}
         <div className="grid grid-cols-2 gap-3">
@@ -356,43 +383,13 @@ function StatusIcon({ status }: { status: 'submitted' | 'pending' | 'missing' | 
 // ════════════════════════════════════════════════════════════════
 function OpsView({ agg, effectiveFilter, selectedOffice, setSelectedOffice, activeEmergencies }: any) {
   const { state } = useOps();
+  const insights = useMemo(() => buildInsights(state.todayReports, state.historicalReports, state.emergencies, state.users), [state.todayReports, state.historicalReports, state.emergencies, state.users]);
 
   return (
     <div className="h-full relative">
-      {/* Top KPI overlay */}
-      <div className="absolute top-3 right-3 z-[400] flex flex-col gap-2 w-48">
-        {[
-          { label: 'إجمالي الزوار', value: agg.visitors, tone: 'amber' },
-          { label: 'إجمالي العجلات', value: agg.vehicles, tone: 'blue' },
-          { label: 'المواكب', value: agg.processions, tone: 'emerald' },
-        ].map(k => {
-          const toneClass: Record<string, string> = {
-            amber: 'from-amber-400 to-orange-600',
-            blue: 'from-blue-400 to-indigo-600',
-            emerald: 'from-emerald-400 to-teal-600',
-          };
-          const textClass: Record<string, string> = {
-            amber: 'text-amber-400',
-            blue: 'text-blue-400',
-            emerald: 'text-emerald-400',
-          };
-          return (
-            <div key={k.label} className="bg-gradient-to-br from-[#0B0F19]/95 to-[#111827]/85 backdrop-blur-md border border-[#1E293B] rounded-lg p-2.5 relative overflow-hidden">
-              <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${toneClass[k.tone]}`} />
-              <div className="text-[10px] text-slate-400 mb-0.5">{k.label}</div>
-              <div className={`kpi-number text-xl ${textClass[k.tone]}`}>
-                {formatNumber(k.value)}
-              </div>
-            </div>
-          );
-        })}
-        <div className={`${activeEmergencies > 0 ? 'bg-gradient-to-br from-red-900/95 to-red-800/85 border-red-500/50 animate-pulse-alert glow-crimson' : 'bg-gradient-to-br from-[#0B0F19]/95 to-[#111827]/85 border-[#1E293B]'} backdrop-blur-md border rounded-lg p-2.5 relative overflow-hidden`}>
-          {activeEmergencies > 0 && <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-red-400 to-rose-700" />}
-          <div className="text-[10px] text-slate-400 mb-0.5">التنبيهات الطارئة</div>
-          <div className={`kpi-number text-xl ${activeEmergencies > 0 ? 'text-red-300' : 'text-slate-300'}`}>
-            {activeEmergencies}
-          </div>
-        </div>
+      {/* Top KPI overlay — customizable */}
+      <div className="absolute top-3 right-3 z-[400] flex flex-col gap-2 w-52 max-h-[70vh] overflow-y-auto">
+        <OpsKpiOverlay agg={agg} activeEmergencies={activeEmergencies} />
       </div>
 
       {/* Emergency banner top-center */}
@@ -414,25 +411,8 @@ function OpsView({ agg, effectiveFilter, selectedOffice, setSelectedOffice, acti
         height="100%"
       />
 
-      {/* Bottom ticker */}
-      <div className="absolute bottom-0 left-0 right-0 z-[400] bg-[#0B0F19]/90 backdrop-blur-md border-t border-[#1E293B] h-10 flex items-center overflow-hidden">
-        <div className="shrink-0 px-3 text-[10px] font-bold text-amber-400 border-l border-[#1E293B] h-full flex items-center">آخر التحديثات</div>
-        <div className="flex-1 overflow-hidden relative">
-          <div className="flex items-center gap-8 px-4 animate-ticker whitespace-nowrap text-xs text-slate-300">
-            {[...state.lastActivity, ...state.lastActivity].map((a: any, i: number) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full ${
-                  a.type === 'emergency' ? 'bg-red-500' :
-                  a.type === 'extension' ? 'bg-amber-500' :
-                  a.type === 'report' ? 'bg-emerald-500' : 'bg-blue-500'
-                }`} />
-                <span>{a.text}</span>
-                <span className="text-slate-500 text-[10px]">— {relativeTime(a.createdAt)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      {/* Bottom smart insights ticker */}
+      <SmartInsightsTicker insights={insights} />
     </div>
   );
 }
@@ -825,3 +805,120 @@ function DrillDownPanel({ office, onClose }: { office: Office; onClose: () => vo
     </>
   );
 }
+
+// ════════════════════════════════════════════════════════════════
+// Customizable KPI grid (for CommandView left column)
+// ════════════════════════════════════════════════════════════════
+function CustomKpiGrid({ agg, aggYesterday, trend, activeEmergencies, cols = 3 }: any) {
+  const { state } = useOps();
+  const ids = state.customKpis;
+  const valFor = (id: string) => id === 'emergencies' ? activeEmergencies : (agg as any)[id] || 0;
+  const yestFor = (id: string) => id === 'emergencies' ? activeEmergencies : (aggYesterday as any)[id] || 0;
+  const colsCls = cols === 4 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3';
+  return (
+    <div className={`grid ${colsCls} gap-3`}>
+      {ids.map((id: string) => {
+        const def = kpiById(id);
+        if (!def) return null;
+        return (
+          <KpiCard
+            key={id}
+            label={def.label}
+            value={valFor(id)}
+            icon={def.icon}
+            trend={id === 'emergencies' ? 0 : trend(valFor(id), yestFor(id))}
+            tone={def.tone as any}
+            borderGlow={id === 'visitors'}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// OpsView KPI overlay (vertical stack of cards)
+// ════════════════════════════════════════════════════════════════
+function OpsKpiOverlay({ agg, activeEmergencies }: any) {
+  const { state } = useOps();
+  const ids = state.customKpis;
+  const toneClass: Record<string, string> = {
+    amber: 'from-amber-400 to-orange-600',
+    blue: 'from-blue-400 to-indigo-600',
+    emerald: 'from-emerald-400 to-teal-600',
+    red: 'from-red-400 to-rose-700',
+    orange: 'from-orange-400 to-red-600',
+    purple: 'from-purple-400 to-fuchsia-700',
+    slate: 'from-slate-400 to-slate-600',
+  };
+  const textClass: Record<string, string> = {
+    amber: 'text-amber-400', blue: 'text-blue-400', emerald: 'text-emerald-400',
+    red: 'text-red-300', orange: 'text-orange-400', purple: 'text-purple-400', slate: 'text-slate-300',
+  };
+  return (
+    <>
+      {ids.map((id: string) => {
+        const def = kpiById(id);
+        if (!def) return null;
+        const v = id === 'emergencies' ? activeEmergencies : (agg as any)[id] || 0;
+        const isEmergency = id === 'emergencies' && v > 0;
+        return (
+          <div
+            key={id}
+            className={`${isEmergency ? 'bg-gradient-to-br from-red-900/95 to-red-800/85 border-red-500/50 animate-pulse-alert glow-crimson' : 'bg-gradient-to-br from-[#0B0F19]/95 to-[#111827]/85 border-[#1E293B]'} backdrop-blur-md border rounded-lg p-2.5 relative overflow-hidden`}
+          >
+            <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${toneClass[def.tone]}`} />
+            <div className="text-[10px] text-slate-400 mb-0.5">{def.label}</div>
+            <div className={`kpi-number text-xl ${textClass[def.tone]}`}>{formatNumber(v)}</div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// Smart Insights ticker (OpsView bottom)
+// ════════════════════════════════════════════════════════════════
+function SmartInsightsTicker({ insights }: { insights: ReturnType<typeof buildInsights> }) {
+  if (insights.length === 0) {
+    return (
+      <div className="absolute bottom-0 left-0 right-0 z-[400] bg-[#0B0F19]/90 backdrop-blur-md border-t border-[#1E293B] h-10 flex items-center px-4 text-xs text-slate-500">
+        لا توجد رؤى لعرضها بعد — ستظهر فور إدخال تقارير اليوم.
+      </div>
+    );
+  }
+  const iconFor = (icon: string) => {
+    switch (icon) {
+      case 'up': return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />;
+      case 'down': return <TrendingDown className="w-3.5 h-3.5 text-red-400" />;
+      case 'alert': return <AlertOctagon className="w-3.5 h-3.5 text-red-400" />;
+      case 'star': return <Star className="w-3.5 h-3.5 text-amber-400" />;
+      case 'service': return <Package className="w-3.5 h-3.5 text-emerald-400" />;
+      case 'idle': return <ZapOff className="w-3.5 h-3.5 text-amber-400" />;
+      default: return <Info className="w-3.5 h-3.5 text-blue-400" />;
+    }
+  };
+  const toneCls = (tone: string) => tone === 'positive' ? 'text-emerald-300' : tone === 'negative' ? 'text-red-300' : tone === 'warning' ? 'text-amber-300' : 'text-slate-200';
+  return (
+    <div className="absolute bottom-0 left-0 right-0 z-[400] bg-[#0B0F19]/95 backdrop-blur-md border-t border-[#1E293B] h-12 flex items-center overflow-hidden">
+      <div className="shrink-0 px-3 text-[10px] font-bold text-amber-400 border-l border-[#1E293B] h-full flex items-center gap-1.5">
+        <Activity className="w-3 h-3 animate-pulse" />
+        رؤى لحظية
+      </div>
+      <div className="flex-1 overflow-hidden relative">
+        <div className="flex items-center gap-10 px-4 animate-ticker whitespace-nowrap text-xs">
+          {[...insights, ...insights].map((ins, i) => (
+            <div key={`${ins.id}-${i}`} className="flex items-center gap-2">
+              {iconFor(ins.icon)}
+              <span className={`font-semibold ${toneCls(ins.tone)}`}>{ins.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Reference unused imports for type safety
+void KPI_CATALOG;
