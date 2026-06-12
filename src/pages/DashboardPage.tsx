@@ -64,13 +64,16 @@ export default function DashboardPage() {
 
   // Apply date-range when set; else use today (cumulative-today behavior).
   const { aggToday, aggYesterday, rangeLabel } = useMemo(() => {
+    const extraKeys = state.fieldDefinitions
+      .filter(f => f.countInStats && !f.isBuiltIn && f.fieldType === 'number' && !f.isHidden)
+      .map(f => f.fieldKey);
     const dr = state.dateRange;
     if (!dr) {
       const yest = new Date(); yest.setDate(yest.getDate() - 1);
       const yestStr = yest.toISOString().slice(0, 10);
       return {
-        aggToday: computeAggregates(state.todayReports, effectiveFilter),
-        aggYesterday: computeAggregates(state.historicalReports.filter(r => r.reportDate === yestStr), effectiveFilter),
+        aggToday: computeAggregates(state.todayReports, effectiveFilter, extraKeys),
+        aggYesterday: computeAggregates(state.historicalReports.filter(r => r.reportDate === yestStr), effectiveFilter, extraKeys),
         rangeLabel: 'اليوم',
       };
     }
@@ -85,11 +88,11 @@ export default function DashboardPage() {
     const prevToStr = prevTo.toISOString().slice(0, 10);
     const prev = all.filter(r => r.reportDate >= prevFromStr && r.reportDate <= prevToStr);
     return {
-      aggToday: computeAggregates(inRange, effectiveFilter),
-      aggYesterday: computeAggregates(prev, effectiveFilter),
+      aggToday: computeAggregates(inRange, effectiveFilter, extraKeys),
+      aggYesterday: computeAggregates(prev, effectiveFilter, extraKeys),
       rangeLabel: dr.from === dr.to ? dr.from : `${dr.from} → ${dr.to}`,
     };
-  }, [state.dateRange, state.todayReports, state.historicalReports, effectiveFilter]);
+  }, [state.dateRange, state.todayReports, state.historicalReports, effectiveFilter, state.fieldDefinitions]);
 
   const trend = (today: number, yest: number) => yest === 0 ? 0 : ((today - yest) / yest) * 100;
   const activeEmergencies = state.emergencies.filter(e => e.status === 'active').length;
