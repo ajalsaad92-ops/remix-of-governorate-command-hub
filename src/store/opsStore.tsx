@@ -7,6 +7,7 @@ import type {
 import { api } from '../lib/api';
 import { isSupabaseConfigured } from '../integrations/supabase/client';
 import EnvErrorPage from '../pages/EnvErrorPage';
+import { fireAlert } from '../lib/notify';
 
 interface OpsState {
   // Auth
