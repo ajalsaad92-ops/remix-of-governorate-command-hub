@@ -14,6 +14,7 @@ import SupervisorPanelPage from './pages/SupervisorPanelPage';
 import { useEffect, useState } from 'react';
 import { ToastPermissions } from './components/ToastPermissions';
 import type { Role } from './data/types';
+import { unlockAudio } from './lib/notify';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: Role[] }) {
   const { state } = useOps();
@@ -84,6 +85,17 @@ export default function App() {
     setPermsRequested(true);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [permsRequested]);
+
+  // Unlock WebAudio on the first user gesture anywhere (required by iOS)
+  useEffect(() => {
+    const handler = () => { unlockAudio(); };
+    window.addEventListener('pointerdown', handler, { once: true });
+    window.addEventListener('keydown', handler, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', handler);
+      window.removeEventListener('keydown', handler);
+    };
+  }, []);
 
   return (
     <OpsProvider>
