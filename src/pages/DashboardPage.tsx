@@ -406,7 +406,7 @@ function OpsView({ agg, effectiveFilter, selectedOffice, setSelectedOffice, acti
       )}
 
       {/* Layer control (right) */}
-      <MapLayerControl position="right" variant="vertical" />
+      <MapLayerControl position="left" variant="vertical" />
 
       {/* Map */}
       <IraqMap
