@@ -270,6 +270,34 @@ function rowToTimeWindow(r: any): TimeWindow {
   };
 }
 
+function rowToFieldGroup(r: any): ReportFieldGroup {
+  return {
+    id: r.id,
+    titleAr: r.title_ar,
+    sortOrder: r.sort_order ?? 0,
+    isHidden: !!r.is_hidden,
+  };
+}
+
+function rowToFieldDefinition(r: any): ReportFieldDefinition {
+  return {
+    id: r.id,
+    groupId: r.group_id,
+    fieldKey: r.field_key,
+    labelAr: r.label_ar,
+    descriptionAr: r.description_ar ?? null,
+    placeholderAr: r.placeholder_ar ?? null,
+    fieldType: r.field_type,
+    sortOrder: r.sort_order ?? 0,
+    maxLength: r.max_length ?? null,
+    isHidden: !!r.is_hidden,
+    isBuiltIn: !!r.is_built_in,
+    countInStats: !!r.count_in_stats,
+    statLabelAr: r.stat_label_ar ?? null,
+    allowedUserIds: Array.isArray(r.allowed_user_ids) ? r.allowed_user_ids : [],
+  };
+}
+
 async function safe<T>(p: Promise<{ data: T | null; error: any }>, fallback: T): Promise<T> {
   const { data, error } = await p;
   if (error) { console.warn('[api]', error.message); return fallback; }
@@ -725,6 +753,77 @@ export const api = {
 
   // ─── Reset (kept for parity; does nothing in the backend) ───────
   async resetDb() { /* no-op against real backend */ },
+
+  // ─── Dynamic report field definitions ───────────────────────────
+  async getFieldGroups(): Promise<ReportFieldGroup[]> {
+    const { data, error } = await supabase
+      .from('report_field_groups')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) { console.warn('[api] getFieldGroups', error.message); return []; }
+    return (data ?? []).map(rowToFieldGroup);
+  },
+
+  async getFieldDefinitions(): Promise<ReportFieldDefinition[]> {
+    const { data, error } = await supabase
+      .from('report_field_definitions')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) { console.warn('[api] getFieldDefinitions', error.message); return []; }
+    return (data ?? []).map(rowToFieldDefinition);
+  },
+
+  async upsertFieldGroup(g: Partial<ReportFieldGroup> & { titleAr: string }): Promise<ReportFieldGroup> {
+    const row: any = {
+      title_ar: g.titleAr,
+      sort_order: g.sortOrder ?? 99,
+      is_hidden: g.isHidden ?? false,
+    };
+    if (g.id) row.id = g.id;
+    const { data, error } = await supabase
+      .from('report_field_groups')
+      .upsert(row)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return rowToFieldGroup(data);
+  },
+
+  async deleteFieldGroup(id: string): Promise<void> {
+    const { error } = await supabase.from('report_field_groups').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async upsertFieldDefinition(f: Partial<ReportFieldDefinition> & { fieldKey: string; labelAr: string; groupId: string }): Promise<ReportFieldDefinition> {
+    const row: any = {
+      group_id: f.groupId,
+      field_key: f.fieldKey,
+      label_ar: f.labelAr,
+      description_ar: f.descriptionAr ?? null,
+      placeholder_ar: f.placeholderAr ?? null,
+      field_type: f.fieldType ?? 'text',
+      sort_order: f.sortOrder ?? 99,
+      max_length: f.maxLength ?? null,
+      is_hidden: f.isHidden ?? false,
+      is_built_in: f.isBuiltIn ?? false,
+      count_in_stats: f.countInStats ?? false,
+      stat_label_ar: f.statLabelAr ?? null,
+      allowed_user_ids: f.allowedUserIds ?? [],
+    };
+    if (f.id) row.id = f.id;
+    const { data, error } = await supabase
+      .from('report_field_definitions')
+      .upsert(row)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return rowToFieldDefinition(data);
+  },
+
+  async deleteFieldDefinition(id: string): Promise<void> {
+    const { error } = await supabase.from('report_field_definitions').delete().eq('id', id);
+    if (error) throw error;
+  },
 };
 
 // Suppress the unused-import linter for safe helper in case future refactors
