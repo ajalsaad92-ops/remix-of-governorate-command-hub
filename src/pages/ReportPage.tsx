@@ -5,45 +5,13 @@ import { MapPin, ChevronDown, Send, MapPinned, X, AlertTriangle, Lock, Timer, Ch
 import { toast } from 'sonner';
 import TimeLockBar from '../components/TimeLockBar';
 import MapPicker from '../components/MapPicker';
-import type { ReportFieldDefinition, ReportFieldGroup, DailyReport } from '../data/types';
+import type { ReportFieldDefinition, ReportFieldGroup } from '../data/types';
 
 type Pt = { lat: number; lng: number };
 
-// ─── Numeric and built-in metadata ───────────────────────────────────
-// Built-in fieldKeys whose values map to dedicated columns in `daily_reports`.
-// Anything else is stored in the `extra_fields` jsonb column.
-const BUILTIN_NUMERIC = new Set([
-  'deploymentCount', 'incidentsCount', 'violationsCount', 'deathsCount',
-  'resourcesDistributed', 'eventsCount', 'visitsCount', 'visitorsIn',
-  'visitorsOut', 'vehiclesCount', 'processionsCount',
-]);
-const BUILTIN_TEXT_KEYS = new Set([
-  'deploymentLocations','deploymentFormations','coordinationSectors','coordinationJointOps',
-  'incidentsDetails','violationsArea','violationsTimeDetail','violationsDetails',
-  'deathsLocationMgrs','deathsActionTaken','resourcesDetails','eventsDetails',
-  'visitsSummary','visitorsRoutes','vehiclesDetails','processionsDetails','otherNotes',
-]);
-// Built-in fields whose value is a geo location/route.
+// Built-in field-keys whose value is a geo location/route.
 const LOC_EVENTS = 'eventsLocation';        // → eventsCoordinates: [Pt]
 const ROUTE_PROC = 'processionRoute';       // → processionWaypoints: Pt[]
-
-// Map fieldKey → column on DailyReport (camelCase) for built-in numeric/text.
-const KEY_TO_FIELD: Record<string, keyof DailyReport> = {
-  deploymentCount: 'deploymentCount', incidentsCount: 'incidentsCount',
-  violationsCount: 'violationsCount', deathsCount: 'deathsCount',
-  resourcesDistributed: 'resourcesDistributed', eventsCount: 'eventsCount',
-  visitsCount: 'visitsCount', visitorsIn: 'visitorsIn', visitorsOut: 'visitorsOut',
-  vehiclesCount: 'vehiclesCount', processionsCount: 'processionsCount',
-  deploymentLocations: 'deploymentLocations', deploymentFormations: 'deploymentFormations',
-  coordinationSectors: 'coordinationSectors', coordinationJointOps: 'coordinationJointOps',
-  incidentsDetails: 'incidentsDetails', violationsArea: 'violationsArea',
-  violationsTimeDetail: 'violationsTimeDetail', violationsDetails: 'violationsDetails',
-  deathsLocationMgrs: 'deathsLocationMgrs', deathsActionTaken: 'deathsActionTaken',
-  resourcesDetails: 'resourcesDetails', eventsDetails: 'eventsDetails',
-  visitsSummary: 'visitsSummary', visitorsRoutes: 'visitorsRoutes',
-  vehiclesDetails: 'vehiclesDetails', processionsDetails: 'processionsDetails',
-  otherNotes: 'otherNotes',
-};
 
 // ─── Page ────────────────────────────────────────────────────────────
 export default function ReportPage() {
