@@ -159,3 +159,29 @@ export const IRAQ_GOVERNORATES: IraqGovernorate[] = [
 
 // Kurdistan region: Erbil + Sulaymaniyah + Duhok (we'll mask KRK too per spec)
 export const KURDISTAN_CODES = ['ERB', 'SUL', 'DOH', 'KRK'];
+
+// Approximate Iraq national outline (clockwise from NW corner with Turkey).
+// Used as a hole inside a world-rectangle mask so that anything outside
+// Iraq is hidden under a white overlay — leaving only Iraqi territory
+// visible on the base map tiles.
+export const IRAQ_OUTLINE: [number, number][] = [
+  // Northern (Turkey) border
+  [37.38, 42.35], [37.32, 42.80], [37.20, 43.40], [37.32, 44.20], [37.15, 44.80],
+  // Eastern (Iran) border
+  [36.75, 45.00], [36.10, 45.45], [35.55, 46.10], [35.10, 46.20], [34.50, 45.95],
+  [33.95, 46.10], [33.30, 46.20], [32.85, 46.55], [32.40, 47.35], [31.90, 47.70],
+  [31.30, 47.85], [30.90, 48.40], [30.40, 48.55], [30.10, 48.55],
+  // Southern (Persian Gulf + Kuwait + Saudi) border
+  [29.85, 48.60], [29.95, 48.40], [30.10, 47.95], [30.10, 47.10], [29.20, 46.55],
+  [29.10, 46.30], [29.45, 45.20], [30.20, 44.70], [31.00, 43.20], [31.40, 41.85],
+  [32.15, 39.20],
+  // Western (Jordan + Syria) border
+  [33.10, 38.80], [33.40, 39.30], [34.10, 40.60], [34.55, 40.95], [35.40, 41.20],
+  [36.40, 41.25], [36.90, 41.70], [37.20, 42.10], [37.38, 42.35],
+];
+
+// Big rectangle covering everything around Iraq — used as the outer ring
+// of the mask polygon (Iraq outline is the hole).
+export const WORLD_MASK_OUTER: [number, number][] = [
+  [10, 20], [10, 70], [55, 70], [55, 20], [10, 20],
+];
