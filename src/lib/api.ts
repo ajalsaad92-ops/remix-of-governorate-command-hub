@@ -634,7 +634,7 @@ export const api = {
     const submittedBy = (await supabase.auth.getUser()).data.user?.id;
     // H3: surface the failure mode (no session) instead of silently returning 0
     if (!submittedBy) return { added: 0, error: 'الجلسة منتهية — أعد تسجيل الدخول ثم حاول مرة أخرى' };
-    for (let dOff = 30; dOff > 14; dOff--) {
+    for (let dOff = 30; dOff >= 0; dOff--) {
       const dt = new Date(); dt.setDate(dt.getDate() - dOff);
       const dateStr = dt.toISOString().slice(0, 10);
       for (const office of offices) {
