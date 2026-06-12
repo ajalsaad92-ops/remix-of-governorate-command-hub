@@ -117,7 +117,7 @@ export default function MapPicker({
                 ))}
                 {pts.length > 1 && (
                   <Polyline
-                    positions={pts.map(p => [p.lat, p.lng])}
+                    positions={pts.map(p => [p.lat, p.lng] as [number, number])}
                     pathOptions={{ color: '#F59E0B', weight: 4, opacity: 0.8, dashArray: mode === 'route' ? undefined : '6,6' }}
                   />
                 )}
