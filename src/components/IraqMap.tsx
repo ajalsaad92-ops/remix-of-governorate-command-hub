@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, Polyline, Circle, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { OFFICES } from '../data/offices';
-import { IRAQ_GOVERNORATES, KURDISTAN_CODES } from '../data/iraqGeo';
+import { IRAQ_GOVERNORATES, KURDISTAN_CODES, IRAQ_OUTLINE, WORLD_MASK_OUTER } from '../data/iraqGeo';
 import { useOps } from '../store/opsStore';
 import { officeById } from '../data/offices';
 import type { Office } from '../data/offices';
@@ -26,15 +26,17 @@ const MAP_CONFIG = {
 };
 
 const governorateColor: Record<string, string> = {
-  NIN: '#3B82F6', SLD: '#10B981', ANB: '#F97316', BGD: '#F59E0B',
-  DLY: '#EF4444', KRK: '#8B5CF6', ERB: '#8B5CF6', SUL: '#8B5CF6', DOH: '#8B5CF6',
-  WST: '#06B6D4', KRB: '#EC4899', NJF: '#84CC16', BBL: '#F472B6',
-  QDS: '#FBBF24', MTH: '#A78BFA', DHQ: '#FB923C', MYS: '#34D399', BAS: '#F87171',
+  // Light, subtle tints over the white basemap so each governorate is
+  // distinguishable without overpowering the street layer underneath.
+  NIN: '#DBEAFE', SLD: '#D1FAE5', ANB: '#FFEDD5', BGD: '#FEF3C7',
+  DLY: '#FEE2E2', KRK: '#EDE9FE', ERB: '#E5E7EB', SUL: '#E5E7EB', DOH: '#E5E7EB',
+  WST: '#CFFAFE', KRB: '#FCE7F3', NJF: '#ECFCCB', BBL: '#FBCFE8',
+  QDS: '#FEF9C3', MTH: '#EDE9FE', DHQ: '#FFEDD5', MYS: '#D1FAE5', BAS: '#FECACA',
 };
 
 // Hexagonal amber SVG marker for offices
 function createOfficeIcon(submitted: boolean, selected: boolean, kurdistan: boolean): L.DivIcon {
-  const color = kurdistan ? '#6B7280' : submitted ? '#F59E0B' : '#475569';
+  const color = kurdistan ? '#9CA3AF' : submitted ? '#F59E0B' : '#0F172A';
   const ringColor = submitted ? '#3B82F6' : 'transparent';
   return L.divIcon({
     className: 'office-marker',
@@ -43,7 +45,7 @@ function createOfficeIcon(submitted: boolean, selected: boolean, kurdistan: bool
         ${submitted ? `<div style="position:absolute; inset:0; border-radius:50%; border:2px solid ${ringColor}; animation:ripple 1.8s ease-out infinite;"></div>` : ''}
         <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">
           <svg width="28" height="28" viewBox="0 0 28 28" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">
-            <polygon points="14,2 25,8 25,20 14,26 3,20 3,8" fill="${color}" stroke="${selected ? '#FCD34D' : '#0B0F19'}" stroke-width="${selected ? 2.5 : 1.5}" opacity="${kurdistan ? 0.5 : 1}"/>
+            <polygon points="14,2 25,8 25,20 14,26 3,20 3,8" fill="${color}" stroke="${selected ? '#D97706' : '#ffffff'}" stroke-width="${selected ? 2.5 : 1.5}" opacity="${kurdistan ? 0.7 : 1}"/>
             <text x="14" y="17" text-anchor="middle" fill="${submitted && !kurdistan ? '#000' : '#fff'}" font-size="10" font-weight="900" font-family="Cairo, sans-serif">م</text>
           </svg>
         </div>
@@ -181,8 +183,21 @@ export default function IraqMap({ onSelectOffice, selectedOfficeId, height = '10
         <MapController selectedOfficeId={selectedOfficeId ?? null} onSelect={onSelectOffice} />
 
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+        />
+
+        {/* Mask: everything outside Iraq is hidden behind a white overlay
+            so the visible map appears to contain Iraq alone. */}
+        <Polygon
+          positions={[WORLD_MASK_OUTER, IRAQ_OUTLINE]}
+          pathOptions={{
+            color: '#94A3B8',
+            weight: 1.5,
+            fillColor: '#ffffff',
+            fillOpacity: 1,
+            interactive: false,
+          }}
         />
 
         {/* Iraq governorate polygons */}
@@ -206,10 +221,10 @@ export default function IraqMap({ onSelectOffice, selectedOfficeId, height = '10
                 },
               }}
               pathOptions={{
-                color: isKurdistan ? '#374151' : isSelected ? '#FCD34D' : isHover ? 'rgba(245, 158, 11, 0.6)' : 'rgba(100, 130, 160, 0.5)',
-                weight: isSelected ? 2.5 : isHover ? 2 : 1,
-                fillColor: isKurdistan ? '#000000' : governorateColor[gov.code] || '#1E293B',
-                fillOpacity: isKurdistan ? 0.55 : isSelected ? 0.35 : isHover ? 0.25 : 0.12,
+                color: isKurdistan ? '#6B7280' : isSelected ? '#D97706' : isHover ? '#F59E0B' : '#475569',
+                weight: isSelected ? 2.5 : isHover ? 2 : 1.2,
+                fillColor: isKurdistan ? '#E5E7EB' : governorateColor[gov.code] || '#F1F5F9',
+                fillOpacity: isKurdistan ? 0.55 : isSelected ? 0.55 : isHover ? 0.5 : 0.35,
                 dashArray: isKurdistan ? '6, 4' : undefined,
               }}
             />
@@ -219,7 +234,7 @@ export default function IraqMap({ onSelectOffice, selectedOfficeId, height = '10
         {/* Kurdistan label */}
         <Marker position={[36.5, 45.2]} icon={L.divIcon({
           className: 'kurdistan-label',
-          html: '<div style="color:#9CA3AF; font-family:Cairo; font-size:11px; font-weight:700; text-shadow:0 1px 2px #000; white-space:nowrap;">إقليم كوردستان</div>',
+          html: '<div style="color:#475569; font-family:Cairo; font-size:11px; font-weight:700; text-shadow:0 1px 2px #fff; white-space:nowrap;">إقليم كوردستان</div>',
           iconSize: [120, 16],
           iconAnchor: [60, 8],
         })} interactive={false} />
