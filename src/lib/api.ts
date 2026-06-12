@@ -15,6 +15,7 @@
 import type {
   Profile, DailyReport, Emergency, ExtensionRequest,
   AgentLocation, VisitorFlowPath, TimeWindow, Role,
+  ReportFieldGroup, ReportFieldDefinition,
 } from '../data/types';
 import { INITIAL_BORDER_CROSSINGS, type BorderCrossing } from '../data/borderCrossings';
 import { supabase } from '../integrations/supabase/client';
@@ -134,6 +135,7 @@ function rowToReport(r: any): DailyReport {
     reporterLat: r.reporter_lat ?? undefined,
     reporterLng: r.reporter_lng ?? undefined,
     mgrsReference: r.mgrs_reference ?? undefined,
+    extraFields: (r.extra_fields && typeof r.extra_fields === 'object') ? r.extra_fields : {},
   };
 }
 
@@ -178,6 +180,7 @@ function reportToRow(rep: DailyReport): any {
     reporter_lat: rep.reporterLat ?? null,
     reporter_lng: rep.reporterLng ?? null,
     mgrs_reference: rep.mgrsReference ?? null,
+    extra_fields: rep.extraFields ?? {},
   };
 }
 
