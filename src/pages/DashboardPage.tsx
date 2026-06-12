@@ -10,7 +10,7 @@ import DateRangeFilter from '../components/DateRangeFilter';
 import { KPI_CATALOG, kpiById } from '../lib/kpiCatalog';
 import { buildInsights } from '../lib/insights';
 import {
-  Users, Truck, Flag, AlertOctagon, BarChart3, Map, Activity,
+  Users, Truck, AlertOctagon, BarChart3, Map, Activity,
   Award, Check, Clock, X, Timer, Search, Download, Plus, TrendingUp, TrendingDown, Star, Info, ZapOff, Package
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area, Legend, CartesianGrid } from 'recharts';
