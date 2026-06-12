@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { X, MapPin, Trash2, Undo2 } from 'lucide-react';
+import { X, MapPin, Trash2, Undo2, Route as RouteIcon, Loader2 } from 'lucide-react';
+import { supabase } from '../integrations/supabase/client';
+import { toast } from 'sonner';
 
 // Default Leaflet icon fix (matches IraqMap.tsx)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -64,6 +66,8 @@ export default function MapPicker({
 }: Props) {
   const [single, setSingle] = useState<Pt | null>(initialSingle ?? null);
   const [pts, setPts] = useState<Pt[]>(initialMulti ?? []);
+  const [snapped, setSnapped] = useState<Pt[] | null>(null);
+  const [snapping, setSnapping] = useState(false);
 
   // close on ESC
   useEffect(() => {
@@ -74,7 +78,25 @@ export default function MapPicker({
 
   const handleClick = (p: Pt) => {
     if (mode === 'single') setSingle(p);
-    else setPts(prev => [...prev, p]);
+    else { setPts(prev => [...prev, p]); setSnapped(null); }
+  };
+
+  const snapToRoads = async () => {
+    if (pts.length < 2) return;
+    setSnapping(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('route-snap', {
+        body: { waypoints: pts, travelMode: 'DRIVE' },
+      });
+      if (error) throw error;
+      if (!data?.polyline?.length) throw new Error('no polyline');
+      setSnapped(data.polyline);
+      toast.success('تم محاذاة المسار على الشوارع');
+    } catch (e) {
+      toast.error('تعذّر محاذاة المسار على الشوارع');
+    } finally {
+      setSnapping(false);
+    }
   };
 
   return (
@@ -118,7 +140,13 @@ export default function MapPicker({
                 {pts.length > 1 && (
                   <Polyline
                     positions={pts.map(p => [p.lat, p.lng] as [number, number])}
-                    pathOptions={{ color: '#F59E0B', weight: 4, opacity: 0.8, dashArray: mode === 'route' ? undefined : '6,6' }}
+                    pathOptions={{ color: '#F59E0B', weight: snapped ? 2 : 4, opacity: snapped ? 0.5 : 0.8, dashArray: '6,6' }}
+                  />
+                )}
+                {mode === 'route' && snapped && snapped.length > 1 && (
+                  <Polyline
+                    positions={snapped.map(p => [p.lat, p.lng] as [number, number])}
+                    pathOptions={{ color: '#22D3EE', weight: 5, opacity: 0.95 }}
                   />
                 )}
               </>
@@ -138,17 +166,27 @@ export default function MapPicker({
             {mode !== 'single' && pts.length > 0 && (
               <>
                 <button
-                  onClick={() => setPts(p => p.slice(0, -1))}
+                  onClick={() => { setPts(p => p.slice(0, -1)); setSnapped(null); }}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1E293B] hover:bg-[#263244] text-slate-300 text-xs font-bold"
                 >
                   <Undo2 className="w-3.5 h-3.5" /> تراجع
                 </button>
                 <button
-                  onClick={() => setPts([])}
+                  onClick={() => { setPts([]); setSnapped(null); }}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-bold border border-red-500/30"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> مسح الكل
                 </button>
+                {mode === 'route' && pts.length >= 2 && (
+                  <button
+                    onClick={snapToRoads}
+                    disabled={snapping}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 text-xs font-bold border border-cyan-500/40 disabled:opacity-50"
+                  >
+                    {snapping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RouteIcon className="w-3.5 h-3.5" />}
+                    محاذاة الشوارع
+                  </button>
+                )}
               </>
             )}
             {mode === 'single' && single && (
@@ -171,9 +209,9 @@ export default function MapPicker({
             ) : (
               <button
                 disabled={pts.length === 0}
-                onClick={() => onConfirmMulti?.(pts)}
+                onClick={() => onConfirmMulti?.(mode === 'route' && snapped ? snapped : pts)}
                 className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-black text-sm font-display font-black"
-              >تأكيد ({pts.length})</button>
+              >تأكيد ({mode === 'route' && snapped ? `${snapped.length} على الشوارع` : pts.length})</button>
             )}
           </div>
         </div>
