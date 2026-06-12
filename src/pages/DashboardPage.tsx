@@ -383,43 +383,13 @@ function StatusIcon({ status }: { status: 'submitted' | 'pending' | 'missing' | 
 // ════════════════════════════════════════════════════════════════
 function OpsView({ agg, effectiveFilter, selectedOffice, setSelectedOffice, activeEmergencies }: any) {
   const { state } = useOps();
+  const insights = useMemo(() => buildInsights(state.todayReports, state.historicalReports, state.emergencies, state.users), [state.todayReports, state.historicalReports, state.emergencies, state.users]);
 
   return (
     <div className="h-full relative">
-      {/* Top KPI overlay */}
-      <div className="absolute top-3 right-3 z-[400] flex flex-col gap-2 w-48">
-        {[
-          { label: 'إجمالي الزوار', value: agg.visitors, tone: 'amber' },
-          { label: 'إجمالي العجلات', value: agg.vehicles, tone: 'blue' },
-          { label: 'المواكب', value: agg.processions, tone: 'emerald' },
-        ].map(k => {
-          const toneClass: Record<string, string> = {
-            amber: 'from-amber-400 to-orange-600',
-            blue: 'from-blue-400 to-indigo-600',
-            emerald: 'from-emerald-400 to-teal-600',
-          };
-          const textClass: Record<string, string> = {
-            amber: 'text-amber-400',
-            blue: 'text-blue-400',
-            emerald: 'text-emerald-400',
-          };
-          return (
-            <div key={k.label} className="bg-gradient-to-br from-[#0B0F19]/95 to-[#111827]/85 backdrop-blur-md border border-[#1E293B] rounded-lg p-2.5 relative overflow-hidden">
-              <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${toneClass[k.tone]}`} />
-              <div className="text-[10px] text-slate-400 mb-0.5">{k.label}</div>
-              <div className={`kpi-number text-xl ${textClass[k.tone]}`}>
-                {formatNumber(k.value)}
-              </div>
-            </div>
-          );
-        })}
-        <div className={`${activeEmergencies > 0 ? 'bg-gradient-to-br from-red-900/95 to-red-800/85 border-red-500/50 animate-pulse-alert glow-crimson' : 'bg-gradient-to-br from-[#0B0F19]/95 to-[#111827]/85 border-[#1E293B]'} backdrop-blur-md border rounded-lg p-2.5 relative overflow-hidden`}>
-          {activeEmergencies > 0 && <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-red-400 to-rose-700" />}
-          <div className="text-[10px] text-slate-400 mb-0.5">التنبيهات الطارئة</div>
-          <div className={`kpi-number text-xl ${activeEmergencies > 0 ? 'text-red-300' : 'text-slate-300'}`}>
-            {activeEmergencies}
-          </div>
-        </div>
+      {/* Top KPI overlay — customizable */}
+      <div className="absolute top-3 right-3 z-[400] flex flex-col gap-2 w-52 max-h-[70vh] overflow-y-auto">
+        <OpsKpiOverlay agg={agg} activeEmergencies={activeEmergencies} />
       </div>
 
       {/* Emergency banner top-center */}
@@ -441,25 +411,8 @@ function OpsView({ agg, effectiveFilter, selectedOffice, setSelectedOffice, acti
         height="100%"
       />
 
-      {/* Bottom ticker */}
-      <div className="absolute bottom-0 left-0 right-0 z-[400] bg-[#0B0F19]/90 backdrop-blur-md border-t border-[#1E293B] h-10 flex items-center overflow-hidden">
-        <div className="shrink-0 px-3 text-[10px] font-bold text-amber-400 border-l border-[#1E293B] h-full flex items-center">آخر التحديثات</div>
-        <div className="flex-1 overflow-hidden relative">
-          <div className="flex items-center gap-8 px-4 animate-ticker whitespace-nowrap text-xs text-slate-300">
-            {[...state.lastActivity, ...state.lastActivity].map((a: any, i: number) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full ${
-                  a.type === 'emergency' ? 'bg-red-500' :
-                  a.type === 'extension' ? 'bg-amber-500' :
-                  a.type === 'report' ? 'bg-emerald-500' : 'bg-blue-500'
-                }`} />
-                <span>{a.text}</span>
-                <span className="text-slate-500 text-[10px]">— {relativeTime(a.createdAt)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      {/* Bottom smart insights ticker */}
+      <SmartInsightsTicker insights={insights} />
     </div>
   );
 }
