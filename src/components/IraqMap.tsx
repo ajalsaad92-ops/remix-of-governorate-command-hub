@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Polygon, GeoJSON, Marker, Popup, Polyline, Circle, useMap, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Marker, Popup, Polyline, Circle, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { OFFICES } from '../data/offices';
 import { KURDISTAN_CODES } from '../data/iraqGeo';
