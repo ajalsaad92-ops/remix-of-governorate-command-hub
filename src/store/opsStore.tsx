@@ -411,14 +411,24 @@ export function OpsProvider({ children }: { children: ReactNode }) {
       }
       if (event.table === 'daily_reports' && event.payload?.new) {
         dispatch({ type: 'ADD_REPORT', report: event.payload.new });
+        const r = event.payload.new;
+        fireAlert('report', 'تقرير جديد', `${r.officeId} — تم استلام تقرير جديد`);
       } else if (event.table === 'emergencies') {
-        if (event.type === 'INSERT' && event.payload?.new) dispatch({ type: 'ADD_EMERGENCY', emergency: event.payload.new });
+        if (event.type === 'INSERT' && event.payload?.new) {
+          dispatch({ type: 'ADD_EMERGENCY', emergency: event.payload.new });
+          const e = event.payload.new;
+          fireAlert('emergency', '🚨 حالة طارئة', `${e.emergencyType} — ${e.reportedByName || e.officeId}`);
+        }
         else if (event.type === 'UPDATE' && event.payload?.new) {
           if (event.payload.new.status === 'resolved') dispatch({ type: 'RESOLVE_EMERGENCY', id: event.payload.new.id });
           else if (event.payload.new.status === 'acknowledged') dispatch({ type: 'ACK_EMERGENCY', id: event.payload.new.id, userId: event.payload.new.acknowledgedById || '' });
         }
       } else if (event.table === 'extension_requests') {
-        if (event.type === 'INSERT' && event.payload?.new) dispatch({ type: 'ADD_EXTENSION', extension: event.payload.new });
+        if (event.type === 'INSERT' && event.payload?.new) {
+          dispatch({ type: 'ADD_EXTENSION', extension: event.payload.new });
+          const x = event.payload.new;
+          fireAlert('extension', 'طلب تمديد جديد', `${x.requestedByName || x.officeId} يطلب تمديد الوقت`);
+        }
         else if (event.type === 'UPDATE' && event.payload?.new) dispatch({ type: 'UPDATE_EXTENSION', id: event.payload.new.id, patch: event.payload.new });
       } else if (event.table === 'time_windows' && event.payload?.new) {
         dispatch({ type: 'SET_TIME_WINDOW', window: event.payload.new });
