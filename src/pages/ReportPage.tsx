@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useOps } from '../store/opsStore';
 import { officeById } from '../data/offices';
-import { MapPin, ChevronDown, Send, MapPinned, X, AlertTriangle, Lock, Timer, Check, Crosshair, Info, Route as RouteIcon } from 'lucide-react';
+import { MapPin, ChevronDown, Send, MapPinned, X, AlertTriangle, Lock, Timer, Check, Crosshair, Info, Route as RouteIcon, History, User as UserIcon, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import TimeLockBar from '../components/TimeLockBar';
 import MapPicker from '../components/MapPicker';
@@ -382,6 +382,7 @@ export default function ReportPage() {
           }
           initialSingle={locations[picker.fieldKey] ?? null}
           initialMulti={routes[picker.fieldKey] ?? []}
+          userLocation={reporterLat != null && reporterLng != null ? { lat: reporterLat, lng: reporterLng } : null}
           onCancel={() => setPicker(null)}
           onConfirmSingle={(p) => {
             setLocations(l => ({ ...l, [picker.fieldKey]: p }));
