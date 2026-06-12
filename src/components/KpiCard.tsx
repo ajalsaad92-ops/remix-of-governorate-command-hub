@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-type GradTone = 'amber' | 'emerald' | 'red' | 'blue' | 'purple' | 'orange';
+type GradTone = 'amber' | 'emerald' | 'red' | 'blue' | 'purple' | 'orange' | 'slate';
 
 const GRADIENTS: Record<GradTone, { from: string; to: string; text: string; glow: string }> = {
   amber:   { from: 'from-amber-400',   to: 'to-orange-600',   text: 'text-amber-400',   glow: 'shadow-amber-500/20' },
@@ -11,6 +11,7 @@ const GRADIENTS: Record<GradTone, { from: string; to: string; text: string; glow
   blue:    { from: 'from-blue-400',    to: 'to-indigo-600',   text: 'text-blue-400',    glow: 'shadow-blue-500/20' },
   purple:  { from: 'from-purple-400',  to: 'to-fuchsia-700',  text: 'text-purple-400',  glow: 'shadow-purple-500/20' },
   orange:  { from: 'from-orange-400',  to: 'to-red-600',      text: 'text-orange-400',  glow: 'shadow-orange-500/20' },
+  slate:   { from: 'from-slate-400',   to: 'to-slate-600',    text: 'text-slate-300',   glow: 'shadow-slate-500/20' },
 };
 
 interface Props {
@@ -91,7 +92,7 @@ export default function KpiCard({ label, value, icon: Icon, iconColor, bgColor, 
   const trendIcon = trend == null || trend === 0 ? Minus : trend > 0 ? TrendingUp : TrendingDown;
   const trendColor = trend == null || trend === 0 ? 'text-slate-500' : trend > 0 ? 'text-emerald-400' : 'text-red-400';
   const TrendIcon = trendIcon;
-  const g = GRADIENTS[tone];
+  const g = GRADIENTS[tone] ?? GRADIENTS.amber;
   const finalIconColor = iconColor ?? g.text;
   const finalBgColor = bgColor ?? `bg-gradient-to-br ${g.from} ${g.to} bg-opacity-10`;
 
