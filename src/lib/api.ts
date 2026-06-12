@@ -18,7 +18,7 @@ import type {
   ReportFieldGroup, ReportFieldDefinition,
 } from '../data/types';
 import { INITIAL_BORDER_CROSSINGS, type BorderCrossing } from '../data/borderCrossings';
-import { supabase } from '../integrations/supabase/client';
+import { isSupabaseConfigured, supabase } from './supabase';
 
 const SESSION_KEY = 'ops:session:v1';
 const SINGLE_TIME_WINDOW_ID = '00000000-0000-0000-0000-000000000001';
@@ -306,7 +306,7 @@ async function safe<T>(p: Promise<{ data: T | null; error: any }>, fallback: T):
 
 // Tiny helper: just check we're configured at all
 function isConfigured(): boolean {
-  return !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  return isSupabaseConfigured;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────

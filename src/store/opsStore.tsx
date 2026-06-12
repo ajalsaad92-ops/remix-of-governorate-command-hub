@@ -5,7 +5,7 @@ import type {
   ReportFieldGroup, ReportFieldDefinition,
 } from '../data/types';
 import { api } from '../lib/api';
-import { isSupabaseConfigured } from '../integrations/supabase/client';
+import { isSupabaseConfigured } from '../lib/supabase';
 import EnvErrorPage from '../pages/EnvErrorPage';
 import { fireAlert } from '../lib/notify';
 
