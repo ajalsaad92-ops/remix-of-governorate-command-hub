@@ -351,6 +351,12 @@ export function OpsProvider({ children }: { children: ReactNode }) {
         ]);
         dispatch({ type: 'SET_DATA', users, todayReports, historicalReports, emergencies, extensions, agentLocations, flowPaths, borderCrossings, timeWindow });
         dispatch({ type: 'SET_SERVER_TIME', time: serverTime });
+        // Load dynamic report-field definitions in parallel; fail silently
+        // so a permission issue doesn't block the rest of the dashboard.
+        try {
+          const [fg, fd] = await Promise.all([api.getFieldGroups(), api.getFieldDefinitions()]);
+          dispatch({ type: 'SET_FIELD_DEFS', groups: fg, definitions: fd });
+        } catch (e) { console.warn('[opsStore] field defs load failed', e); }
         if (user) dispatch({ type: 'AUTH_SUCCESS', user });
         else dispatch({ type: 'AUTH_FAIL' });
       } catch (e) {
