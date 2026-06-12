@@ -226,12 +226,8 @@ function CommandView({ agg, trend, aggYesterday, effectiveFilter, selectedOffice
     <div className="h-full flex flex-col lg:flex-row gap-3 p-3 overflow-hidden">
       {/* Left 45% */}
       <div className="lg:w-[45%] flex flex-col gap-3 overflow-y-auto">
-        {/* Top KPIs */}
-        <div className="grid grid-cols-3 gap-3">
-          <KpiCard label="إجمالي الزوار" value={agg.visitors} icon={Users} trend={trend(agg.visitors, aggYesterday.visitors)} borderGlow tone="amber" />
-          <KpiCard label="حركة العجلات" value={agg.vehicles} icon={Truck} trend={trend(agg.vehicles, aggYesterday.vehicles)} tone="blue" />
-          <KpiCard label="المواكب" value={agg.processions} icon={Flag} trend={trend(agg.processions, aggYesterday.processions)} tone="emerald" />
-        </div>
+        {/* Top KPIs — driven by customKpis */}
+        <CustomKpiGrid agg={agg} aggYesterday={aggYesterday} trend={trend} activeEmergencies={activeEmergencies} cols={3} />
 
         {/* Charts */}
         <div className="grid grid-cols-2 gap-3">
