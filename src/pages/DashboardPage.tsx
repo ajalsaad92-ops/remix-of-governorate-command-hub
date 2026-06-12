@@ -5,9 +5,13 @@ import { OFFICES, officeById } from '../data/offices';
 import KpiCard from '../components/KpiCard';
 import IraqMap from '../components/IraqMap';
 import MapLayerControl from '../components/MapLayerControl';
+import KpiCustomizer from '../components/KpiCustomizer';
+import DateRangeFilter from '../components/DateRangeFilter';
+import { KPI_CATALOG, kpiById } from '../lib/kpiCatalog';
+import { buildInsights } from '../lib/insights';
 import {
   Users, Truck, Flag, AlertOctagon, BarChart3, Map, Activity,
-  Award, Check, Clock, X, Timer, Search, Download, Plus
+  Award, Check, Clock, X, Timer, Search, Download, Plus, TrendingUp, TrendingDown, Star, Info, ZapOff, Package
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area, Legend, CartesianGrid } from 'recharts';
 import { formatNumber, formatFullNumber, relativeTime } from '../lib/utils';
@@ -48,12 +52,34 @@ export default function DashboardPage() {
   const effectiveFilter = state.officeFilter.length === 0 ? permittedIds :
     state.officeFilter.filter(id => permittedIds.includes(id));
 
-  const aggToday = useMemo(() => computeAggregates(state.todayReports, effectiveFilter), [state.todayReports, effectiveFilter]);
-  const aggYesterday = useMemo(() => {
-    const yest = new Date(); yest.setDate(yest.getDate() - 1);
-    const yestStr = yest.toISOString().slice(0, 10);
-    return computeAggregates(state.historicalReports.filter(r => r.reportDate === yestStr), effectiveFilter);
-  }, [state.historicalReports, effectiveFilter]);
+  // Apply date-range when set; else use today (cumulative-today behavior).
+  const { aggToday, aggYesterday, rangeLabel } = useMemo(() => {
+    const dr = state.dateRange;
+    if (!dr) {
+      const yest = new Date(); yest.setDate(yest.getDate() - 1);
+      const yestStr = yest.toISOString().slice(0, 10);
+      return {
+        aggToday: computeAggregates(state.todayReports, effectiveFilter),
+        aggYesterday: computeAggregates(state.historicalReports.filter(r => r.reportDate === yestStr), effectiveFilter),
+        rangeLabel: 'اليوم',
+      };
+    }
+    const all = [...state.historicalReports, ...state.todayReports];
+    const inRange = all.filter(r => r.reportDate >= dr.from && r.reportDate <= dr.to);
+    // Previous equal-length window for trend
+    const fromD = new Date(dr.from), toD = new Date(dr.to);
+    const days = Math.max(1, Math.round((toD.getTime() - fromD.getTime()) / 86400000) + 1);
+    const prevTo = new Date(fromD); prevTo.setDate(prevTo.getDate() - 1);
+    const prevFrom = new Date(prevTo); prevFrom.setDate(prevFrom.getDate() - (days - 1));
+    const prevFromStr = prevFrom.toISOString().slice(0, 10);
+    const prevToStr = prevTo.toISOString().slice(0, 10);
+    const prev = all.filter(r => r.reportDate >= prevFromStr && r.reportDate <= prevToStr);
+    return {
+      aggToday: computeAggregates(inRange, effectiveFilter),
+      aggYesterday: computeAggregates(prev, effectiveFilter),
+      rangeLabel: dr.from === dr.to ? dr.from : `${dr.from} → ${dr.to}`,
+    };
+  }, [state.dateRange, state.todayReports, state.historicalReports, effectiveFilter]);
 
   const trend = (today: number, yest: number) => yest === 0 ? 0 : ((today - yest) / yest) * 100;
   const activeEmergencies = state.emergencies.filter(e => e.status === 'active').length;
@@ -142,7 +168,12 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {user.role !== 'agent' && <DateRangeFilter />}
+        {user.role !== 'agent' && <KpiCustomizer />}
+
         <div className="text-xs text-slate-500 hidden md:flex items-center gap-1">
+          <span>•</span>
+          <span className="text-amber-400 font-bold">{rangeLabel}</span>
           <span>•</span>
           <span>آخر تحديث: {state.serverTime.toLocaleTimeString('en-GB', { hour12: false })}</span>
         </div>
