@@ -805,3 +805,120 @@ function DrillDownPanel({ office, onClose }: { office: Office; onClose: () => vo
     </>
   );
 }
+
+// ════════════════════════════════════════════════════════════════
+// Customizable KPI grid (for CommandView left column)
+// ════════════════════════════════════════════════════════════════
+function CustomKpiGrid({ agg, aggYesterday, trend, activeEmergencies, cols = 3 }: any) {
+  const { state } = useOps();
+  const ids = state.customKpis;
+  const valFor = (id: string) => id === 'emergencies' ? activeEmergencies : (agg as any)[id] || 0;
+  const yestFor = (id: string) => id === 'emergencies' ? activeEmergencies : (aggYesterday as any)[id] || 0;
+  const colsCls = cols === 4 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3';
+  return (
+    <div className={`grid ${colsCls} gap-3`}>
+      {ids.map((id: string) => {
+        const def = kpiById(id);
+        if (!def) return null;
+        return (
+          <KpiCard
+            key={id}
+            label={def.label}
+            value={valFor(id)}
+            icon={def.icon}
+            trend={id === 'emergencies' ? 0 : trend(valFor(id), yestFor(id))}
+            tone={def.tone as any}
+            borderGlow={id === 'visitors'}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// OpsView KPI overlay (vertical stack of cards)
+// ════════════════════════════════════════════════════════════════
+function OpsKpiOverlay({ agg, activeEmergencies }: any) {
+  const { state } = useOps();
+  const ids = state.customKpis;
+  const toneClass: Record<string, string> = {
+    amber: 'from-amber-400 to-orange-600',
+    blue: 'from-blue-400 to-indigo-600',
+    emerald: 'from-emerald-400 to-teal-600',
+    red: 'from-red-400 to-rose-700',
+    orange: 'from-orange-400 to-red-600',
+    purple: 'from-purple-400 to-fuchsia-700',
+    slate: 'from-slate-400 to-slate-600',
+  };
+  const textClass: Record<string, string> = {
+    amber: 'text-amber-400', blue: 'text-blue-400', emerald: 'text-emerald-400',
+    red: 'text-red-300', orange: 'text-orange-400', purple: 'text-purple-400', slate: 'text-slate-300',
+  };
+  return (
+    <>
+      {ids.map((id: string) => {
+        const def = kpiById(id);
+        if (!def) return null;
+        const v = id === 'emergencies' ? activeEmergencies : (agg as any)[id] || 0;
+        const isEmergency = id === 'emergencies' && v > 0;
+        return (
+          <div
+            key={id}
+            className={`${isEmergency ? 'bg-gradient-to-br from-red-900/95 to-red-800/85 border-red-500/50 animate-pulse-alert glow-crimson' : 'bg-gradient-to-br from-[#0B0F19]/95 to-[#111827]/85 border-[#1E293B]'} backdrop-blur-md border rounded-lg p-2.5 relative overflow-hidden`}
+          >
+            <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${toneClass[def.tone]}`} />
+            <div className="text-[10px] text-slate-400 mb-0.5">{def.label}</div>
+            <div className={`kpi-number text-xl ${textClass[def.tone]}`}>{formatNumber(v)}</div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// Smart Insights ticker (OpsView bottom)
+// ════════════════════════════════════════════════════════════════
+function SmartInsightsTicker({ insights }: { insights: ReturnType<typeof buildInsights> }) {
+  if (insights.length === 0) {
+    return (
+      <div className="absolute bottom-0 left-0 right-0 z-[400] bg-[#0B0F19]/90 backdrop-blur-md border-t border-[#1E293B] h-10 flex items-center px-4 text-xs text-slate-500">
+        لا توجد رؤى لعرضها بعد — ستظهر فور إدخال تقارير اليوم.
+      </div>
+    );
+  }
+  const iconFor = (icon: string) => {
+    switch (icon) {
+      case 'up': return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />;
+      case 'down': return <TrendingDown className="w-3.5 h-3.5 text-red-400" />;
+      case 'alert': return <AlertOctagon className="w-3.5 h-3.5 text-red-400" />;
+      case 'star': return <Star className="w-3.5 h-3.5 text-amber-400" />;
+      case 'service': return <Package className="w-3.5 h-3.5 text-emerald-400" />;
+      case 'idle': return <ZapOff className="w-3.5 h-3.5 text-amber-400" />;
+      default: return <Info className="w-3.5 h-3.5 text-blue-400" />;
+    }
+  };
+  const toneCls = (tone: string) => tone === 'positive' ? 'text-emerald-300' : tone === 'negative' ? 'text-red-300' : tone === 'warning' ? 'text-amber-300' : 'text-slate-200';
+  return (
+    <div className="absolute bottom-0 left-0 right-0 z-[400] bg-[#0B0F19]/95 backdrop-blur-md border-t border-[#1E293B] h-12 flex items-center overflow-hidden">
+      <div className="shrink-0 px-3 text-[10px] font-bold text-amber-400 border-l border-[#1E293B] h-full flex items-center gap-1.5">
+        <Activity className="w-3 h-3 animate-pulse" />
+        رؤى لحظية
+      </div>
+      <div className="flex-1 overflow-hidden relative">
+        <div className="flex items-center gap-10 px-4 animate-ticker whitespace-nowrap text-xs">
+          {[...insights, ...insights].map((ins, i) => (
+            <div key={`${ins.id}-${i}`} className="flex items-center gap-2">
+              {iconFor(ins.icon)}
+              <span className={`font-semibold ${toneCls(ins.tone)}`}>{ins.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Reference unused imports for type safety
+void KPI_CATALOG;
