@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useOps } from '../store/opsStore';
 import { officeById } from '../data/offices';
-import { MapPin, ChevronDown, Send, MapPinned, X, AlertTriangle, Lock, Timer, Check, Crosshair, Info, Route as RouteIcon } from 'lucide-react';
+import { MapPin, ChevronDown, Send, MapPinned, X, AlertTriangle, Lock, Timer, Check, Crosshair, Info, Route as RouteIcon, History, User as UserIcon, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import TimeLockBar from '../components/TimeLockBar';
 import MapPicker from '../components/MapPicker';
@@ -368,6 +368,11 @@ export default function ReportPage() {
             )}
           </button>
         </div>
+
+        {/* Past reports — visible only to office manager / supervisor / director */}
+        {user.role !== 'agent' && (
+          <PreviousReportsPanel currentUserRole={user.role} currentUserOfficeId={user.officeId} />
+        )}
       </div>
 
       {/* Real Leaflet map picker */}
@@ -382,6 +387,7 @@ export default function ReportPage() {
           }
           initialSingle={locations[picker.fieldKey] ?? null}
           initialMulti={routes[picker.fieldKey] ?? []}
+          userLocation={reporterLat != null && reporterLng != null ? { lat: reporterLat, lng: reporterLng } : null}
           onCancel={() => setPicker(null)}
           onConfirmSingle={(p) => {
             setLocations(l => ({ ...l, [picker.fieldKey]: p }));
@@ -578,4 +584,101 @@ function DynamicFieldRenderer({
     );
   }
   return null;
+}
+
+// ─── Previous-reports panel (manager/supervisor/director only) ──────
+function PreviousReportsPanel({ currentUserRole, currentUserOfficeId }: { currentUserRole: string; currentUserOfficeId: string }) {
+  const { state } = useOps();
+  const all = useMemo(() => {
+    const merged = [...state.todayReports, ...state.historicalReports];
+    // Office managers only see their own office; supervisors+directors see all
+    const scoped = currentUserRole === 'manager'
+      ? merged.filter(r => r.officeId === currentUserOfficeId)
+      : merged;
+    return scoped
+      .slice()
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+      .slice(0, 20);
+  }, [state.todayReports, state.historicalReports, currentUserRole, currentUserOfficeId]);
+
+  const [open, setOpen] = useState<string | null>(null);
+  const userById = (id: string) => state.users.find(u => u.id === id);
+
+  return (
+    <div className="mt-4 bg-[#111827] border border-[#1E293B] rounded-xl overflow-hidden">
+      <div className="p-4 border-b border-[#1E293B] flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-300">
+          <History className="w-4 h-4" />
+        </div>
+        <div className="flex-1">
+          <div className="font-display font-black text-sm">التقارير السابقة</div>
+          <div className="text-[10px] text-slate-500">آخر {all.length} تقرير — يظهر فقط للمدير العام والمشرف ومدير المكتب</div>
+        </div>
+      </div>
+      {all.length === 0 ? (
+        <div className="p-6 text-center text-xs text-slate-500">لا توجد تقارير سابقة بعد</div>
+      ) : (
+        <ul className="divide-y divide-[#1E293B] max-h-[420px] overflow-y-auto">
+          {all.map(r => {
+            const submitter = userById(r.submittedBy);
+            const office = officeById(r.officeId);
+            const isOpen = open === r.id;
+            const t = new Date(r.submittedAt);
+            return (
+              <li key={r.id} className="p-3 hover:bg-[#1E293B]/30 transition-colors">
+                <button onClick={() => setOpen(isOpen ? null : r.id)} className="w-full text-right flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
+                    <UserIcon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold truncate">{submitter?.fullNameAr || r.submittedBy}</div>
+                    <div className="text-[10px] text-slate-500 truncate">{office?.nameAr || r.officeId} • {r.reportDate}</div>
+                  </div>
+                  <div className="text-left shrink-0">
+                    <div className="text-[11px] text-slate-300 font-mono flex items-center gap-1 justify-end">
+                      <Clock className="w-3 h-3 text-slate-500" />
+                      {t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    {r.reporterLat != null && r.reporterLng != null && (
+                      <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 justify-end mt-0.5">
+                        <MapPin className="w-3 h-3" />
+                        {r.reporterLat.toFixed(3)}, {r.reporterLng.toFixed(3)}
+                      </div>
+                    )}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isOpen && (
+                  <div className="mt-3 pl-12 grid grid-cols-2 gap-2 text-[11px] animate-fade-in-up">
+                    <Stat label="انتشار" v={r.deploymentCount} />
+                    <Stat label="حوادث" v={r.incidentsCount} />
+                    <Stat label="مخالفات" v={r.violationsCount} />
+                    <Stat label="وفيات" v={r.deathsCount} />
+                    <Stat label="زوار داخل" v={r.visitorsIn} />
+                    <Stat label="زوار خارج" v={r.visitorsOut} />
+                    <Stat label="عجلات" v={r.vehiclesCount} />
+                    <Stat label="مواكب" v={r.processionsCount} />
+                    {r.isLateSubmission && (
+                      <div className="col-span-2 mt-1 p-1.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> إرسال متأخر
+                      </div>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, v }: { label: string; v: number }) {
+  return (
+    <div className="bg-[#0B0F19] border border-[#1E293B] rounded px-2 py-1 flex items-center justify-between">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-mono font-bold text-slate-200">{v ?? 0}</span>
+    </div>
+  );
 }

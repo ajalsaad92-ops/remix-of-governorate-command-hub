@@ -63,9 +63,9 @@ export default function AppShell() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#0B0F19] text-slate-100" dir="rtl">
-      {/* Sidebar */}
+      {/* Sidebar — hidden on mobile, replaced by bottom nav */}
       <aside
-        className={`${collapsed ? 'w-16' : 'w-56'} shrink-0 bg-[#0B0F19] border-l border-[#1E293B] flex flex-col transition-all duration-300 relative`}
+        className={`hidden md:flex ${collapsed ? 'w-16' : 'w-56'} shrink-0 bg-[#0B0F19] border-l border-[#1E293B] flex-col transition-all duration-300 relative`}
       >
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -131,8 +131,11 @@ export default function AppShell() {
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="h-14 shrink-0 bg-[#0B0F19] border-b border-[#1E293B] flex items-center justify-between px-4 gap-3">
+        <header className="h-14 shrink-0 bg-[#0B0F19] border-b border-[#1E293B] flex items-center justify-between px-3 sm:px-4 gap-2 sm:gap-3">
           <div className="flex items-center gap-3 min-w-0">
+            <div className="md:hidden w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shrink-0">
+              <Hexagon className="w-4 h-4 text-black fill-black/20" />
+            </div>
             <div className="flex items-center gap-2 text-amber-400">
               <Radio className="w-4 h-4 animate-pulse" />
               <span className="text-xs font-display font-bold hidden sm:inline">منظومة الرصد الميداني العملياتي</span>
@@ -231,9 +234,42 @@ export default function AppShell() {
         {isDirector && <EmergencyBanner />}
 
         {/* Page content */}
-        <main className="flex-1 overflow-hidden bg-[#0B0F19]">
+        <main className="flex-1 overflow-hidden bg-[#0B0F19] pb-16 md:pb-0">
           <Outlet />
         </main>
+
+        {/* Mobile bottom nav */}
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#0B0F19]/95 backdrop-blur border-t border-[#1E293B] flex items-stretch">
+          {navItems.filter(i => i.show).slice(0, 5).map(item => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] transition-colors ${
+                    isActive ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon size={18} className={isActive ? 'scale-110 transition-transform' : ''} />
+                    <span className="truncate max-w-[68px]">{item.label}</span>
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+          <button
+            onClick={handleLogout}
+            className="flex flex-col items-center justify-center gap-0.5 py-2 px-3 text-[10px] text-slate-500 hover:text-red-400"
+            aria-label="تسجيل الخروج"
+          >
+            <LogOut size={18} />
+            <span>خروج</span>
+          </button>
+        </nav>
       </div>
     </div>
   );

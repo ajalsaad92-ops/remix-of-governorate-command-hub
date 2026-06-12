@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { X, MapPin, Trash2, Undo2, Route as RouteIcon, Loader2 } from 'lucide-react';
+import { X, MapPin, Trash2, Undo2, Route as RouteIcon, Loader2, Crosshair } from 'lucide-react';
 import { supabase } from '../integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -41,12 +41,42 @@ function ClickCapture({ onClick }: { onClick: (p: Pt) => void }) {
   return null;
 }
 
+/**
+ * Centres the map on the user's GPS position the first time it becomes
+ * available, at a zoom that matches roughly 750m of altitude
+ * (≈ zoom level 17 in the Web Mercator tile pyramid).
+ */
+function CenterOnUser({ pos }: { pos: Pt | null }) {
+  const map = useMap();
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (!pos || done) return;
+    map.setView([pos.lat, pos.lng], 17, { animate: true });
+    setDone(true);
+  }, [pos, done, map]);
+  return null;
+}
+
+function userIcon() {
+  return L.divIcon({
+    className: 'map-user-icon',
+    html: `
+      <div style="position:relative;width:22px;height:22px;transform:translate(-50%,-50%);">
+        <div style="position:absolute;inset:0;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 0 2px #3B82F6, 0 0 10px rgba(59,130,246,.6);"></div>
+        <div style="position:absolute;inset:-10px;border-radius:50%;background:rgba(59,130,246,.18);animation:ping-slow 1.6s ease-out infinite;"></div>
+      </div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
 interface Props {
   mode: 'single' | 'multi' | 'route';
   title: string;
   subtitle?: string;
   initialSingle?: Pt | null;
   initialMulti?: Pt[];
+  userLocation?: Pt | null;
   onCancel: () => void;
   onConfirmSingle?: (p: Pt) => void;
   onConfirmMulti?: (pts: Pt[]) => void;
@@ -62,12 +92,25 @@ interface Props {
  */
 export default function MapPicker({
   mode, title, subtitle, initialSingle, initialMulti,
-  onCancel, onConfirmSingle, onConfirmMulti,
+  userLocation, onCancel, onConfirmSingle, onConfirmMulti,
 }: Props) {
   const [single, setSingle] = useState<Pt | null>(initialSingle ?? null);
   const [pts, setPts] = useState<Pt[]>(initialMulti ?? []);
   const [snapped, setSnapped] = useState<Pt[] | null>(null);
   const [snapping, setSnapping] = useState(false);
+  const [livePos, setLivePos] = useState<Pt | null>(userLocation ?? null);
+
+  // Try to obtain a high-accuracy GPS fix when the picker opens —
+  // independent from the parent (so the picker works even when the
+  // parent hasn't requested location yet).
+  useEffect(() => {
+    if (livePos || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      p => setLivePos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30_000 }
+    );
+  }, [livePos]);
 
   // close on ESC
   useEffect(() => {
@@ -101,23 +144,23 @@ export default function MapPicker({
 
   return (
     <div className="fixed inset-0 z-[700] bg-black/70 flex items-center justify-center p-3 animate-fade-in-up" onClick={onCancel}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-3xl bg-[#0B0F19] border border-amber-500/30 rounded-2xl overflow-hidden shadow-2xl">
-        <div className="p-4 border-b border-[#1E293B] flex items-center justify-between">
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-3xl max-h-[95vh] flex flex-col bg-[#0B0F19] border border-amber-500/30 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="p-3 sm:p-4 border-b border-[#1E293B] flex items-center justify-between gap-2">
           <div>
-            <div className="font-display font-black text-amber-400">{title}</div>
-            <div className="text-xs text-slate-400">{subtitle ?? (mode === 'single' ? 'انقر على الخريطة لتحديد موقع واحد' : 'انقر لإضافة نقاط على المسار')}</div>
+            <div className="font-display font-black text-amber-400 text-sm sm:text-base">{title}</div>
+            <div className="text-[11px] sm:text-xs text-slate-400 line-clamp-2">{subtitle ?? (mode === 'single' ? 'انقر على الخريطة لتحديد موقع واحد' : 'انقر لإضافة نقاط على المسار')}</div>
           </div>
-          <button onClick={onCancel} className="w-8 h-8 rounded-lg bg-[#1E293B] hover:bg-[#263244] flex items-center justify-center text-slate-400">
+          <button onClick={onCancel} className="w-9 h-9 rounded-lg bg-[#1E293B] hover:bg-[#263244] flex items-center justify-center text-slate-400 shrink-0">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div style={{ height: 420 }} className="relative">
+        <div className="relative flex-1 min-h-[55vh] sm:min-h-[420px]">
           <MapContainer
-            center={IRAQ_CENTER}
-            zoom={6}
+            center={livePos ? [livePos.lat, livePos.lng] : IRAQ_CENTER}
+            zoom={livePos ? 17 : 6}
             minZoom={5}
-            maxZoom={16}
+            maxZoom={19}
             maxBounds={IRAQ_BOUNDS}
             maxBoundsViscosity={0.8}
             style={{ width: '100%', height: '100%', cursor: 'crosshair' }}
@@ -125,8 +168,14 @@ export default function MapPicker({
             <TileLayer
               url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
               attribution='&copy; OpenStreetMap &copy; CARTO'
+              maxZoom={19}
             />
             <ClickCapture onClick={handleClick} />
+            <CenterOnUser pos={livePos} />
+
+            {livePos && (
+              <Marker position={[livePos.lat, livePos.lng]} icon={userIcon()} />
+            )}
 
             {mode === 'single' && single && (
               <Marker position={[single.lat, single.lng]} icon={pinIcon('#F59E0B')} />
@@ -153,15 +202,20 @@ export default function MapPicker({
             )}
           </MapContainer>
 
-          <div className="absolute top-2 left-2 bg-[#0B0F19]/85 border border-[#1E293B] rounded-md px-3 py-1.5 text-[11px] text-amber-300 pointer-events-none flex items-center gap-1.5">
+          <div className="absolute top-2 left-2 bg-[#0B0F19]/85 border border-[#1E293B] rounded-md px-2.5 py-1 text-[10px] sm:text-[11px] text-amber-300 pointer-events-none flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5" />
             {mode === 'single'
               ? (single ? `${single.lat.toFixed(5)}, ${single.lng.toFixed(5)}` : 'انقر لتحديد موقع')
               : `${pts.length} نقطة`}
           </div>
+          {livePos && (
+            <div className="absolute bottom-2 left-2 bg-[#0B0F19]/85 border border-blue-500/30 rounded-md px-2.5 py-1 text-[10px] sm:text-[11px] text-blue-300 pointer-events-none flex items-center gap-1.5">
+              <Crosshair className="w-3.5 h-3.5" /> موقعك الحالي
+            </div>
+          )}
         </div>
 
-        <div className="p-4 border-t border-[#1E293B] flex items-center justify-between gap-2 flex-wrap">
+        <div className="p-3 sm:p-4 border-t border-[#1E293B] flex items-center justify-between gap-2 flex-wrap">
           <div className="flex gap-2">
             {mode !== 'single' && pts.length > 0 && (
               <>
