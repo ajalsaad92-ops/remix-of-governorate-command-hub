@@ -1,4 +1,4 @@
-import { Users, Truck, Flag, AlertOctagon, X, Activity, Package, Skull, Calendar, Shield, Eye } from 'lucide-react';
+import { Users, Truck, Flag, AlertOctagon, Package, Skull, Calendar, Shield, Eye } from 'lucide-react';
 
 export type KpiId =
   | 'visitors' | 'vehicles' | 'processions' | 'emergencies'
