@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useOps } from '../store/opsStore';
-import { Bell, ChevronLeft, LayoutDashboard, FileText, AlertOctagon, History, Users, Timer, LogOut, Hexagon, Radio } from 'lucide-react';
+import { Bell, ChevronLeft, LayoutDashboard, FileText, AlertOctagon, History, Users, Timer, LogOut, Hexagon, Radio, Settings2 } from 'lucide-react';
 import TimeLockBar from './TimeLockBar';
 import EmergencyBanner from './EmergencyBanner';
 import { OFFICES } from '../data/offices';
@@ -50,6 +50,7 @@ export default function AppShell() {
     { to: '/emergency', label: 'حالة طارئة', icon: AlertOctagon, show: true },
     { to: '/history', label: 'السجل والتصدير', icon: History, show: !isAgent },
     { to: '/supervisor-panel', label: 'لوحة المشرف', icon: Timer, show: isSupervisorPlus },
+    { to: '/report-fields', label: 'حقول التقرير', icon: Settings2, show: isSupervisorPlus },
     { to: '/admin', label: 'المستخدمون', icon: Users, show: isDirector },
   ];
 
