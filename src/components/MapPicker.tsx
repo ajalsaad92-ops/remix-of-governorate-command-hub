@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { X, MapPin, Trash2, Undo2, Route as RouteIcon, Loader2, Crosshair } from 'lucide-react';
-import { supabase } from '../integrations/supabase/client';
+import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
 // Default Leaflet icon fix (matches IraqMap.tsx)
