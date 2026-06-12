@@ -19,7 +19,7 @@ interface Props {
 export default function MapLayerControl({ position = 'right', variant = 'vertical', className = '' }: Props) {
   const { state, dispatch } = useOps();
   const active = state.activeMapLayers;
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const activeCount = LAYERS.filter(l => active.has(l.id)).length;
 
   if (variant === 'horizontal') {
