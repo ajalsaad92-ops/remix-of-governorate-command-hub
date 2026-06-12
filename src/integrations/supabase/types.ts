@@ -108,6 +108,7 @@ export type Database = {
           events_coordinates: Json
           events_count: number
           events_details: string | null
+          extra_fields: Json
           id: string
           incidents_count: number
           incidents_details: string | null
@@ -150,6 +151,7 @@ export type Database = {
           events_coordinates?: Json
           events_count?: number
           events_details?: string | null
+          extra_fields?: Json
           id?: string
           incidents_count?: number
           incidents_details?: string | null
@@ -192,6 +194,7 @@ export type Database = {
           events_coordinates?: Json
           events_count?: number
           events_details?: string | null
+          extra_fields?: Json
           id?: string
           incidents_count?: number
           incidents_details?: string | null
@@ -442,6 +445,98 @@ export type Database = {
         }
         Relationships: []
       }
+      report_field_definitions: {
+        Row: {
+          allowed_user_ids: string[]
+          count_in_stats: boolean
+          created_at: string
+          description_ar: string | null
+          field_key: string
+          field_type: Database["public"]["Enums"]["report_field_type"]
+          group_id: string
+          id: string
+          is_built_in: boolean
+          is_hidden: boolean
+          label_ar: string
+          max_length: number | null
+          placeholder_ar: string | null
+          sort_order: number
+          stat_label_ar: string | null
+          updated_at: string
+        }
+        Insert: {
+          allowed_user_ids?: string[]
+          count_in_stats?: boolean
+          created_at?: string
+          description_ar?: string | null
+          field_key: string
+          field_type?: Database["public"]["Enums"]["report_field_type"]
+          group_id: string
+          id?: string
+          is_built_in?: boolean
+          is_hidden?: boolean
+          label_ar: string
+          max_length?: number | null
+          placeholder_ar?: string | null
+          sort_order?: number
+          stat_label_ar?: string | null
+          updated_at?: string
+        }
+        Update: {
+          allowed_user_ids?: string[]
+          count_in_stats?: boolean
+          created_at?: string
+          description_ar?: string | null
+          field_key?: string
+          field_type?: Database["public"]["Enums"]["report_field_type"]
+          group_id?: string
+          id?: string
+          is_built_in?: boolean
+          is_hidden?: boolean
+          label_ar?: string
+          max_length?: number | null
+          placeholder_ar?: string | null
+          sort_order?: number
+          stat_label_ar?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_field_definitions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "report_field_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_field_groups: {
+        Row: {
+          created_at: string
+          id: string
+          is_hidden: boolean
+          sort_order: number
+          title_ar: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_hidden?: boolean
+          sort_order?: number
+          title_ar: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_hidden?: boolean
+          sort_order?: number
+          title_ar?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       time_windows: {
         Row: {
           close_time: string
@@ -579,6 +674,15 @@ export type Database = {
     }
     Enums: {
       app_role: "director" | "supervisor" | "manager" | "agent"
+      report_field_type:
+        | "number"
+        | "text"
+        | "textarea"
+        | "location"
+        | "multi_location"
+        | "route"
+        | "date"
+        | "time"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -707,6 +811,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["director", "supervisor", "manager", "agent"],
+      report_field_type: [
+        "number",
+        "text",
+        "textarea",
+        "location",
+        "multi_location",
+        "route",
+        "date",
+        "time",
+      ],
     },
   },
 } as const
