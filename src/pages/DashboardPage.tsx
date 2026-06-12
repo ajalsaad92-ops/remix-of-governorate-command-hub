@@ -7,7 +7,7 @@ import IraqMap from '../components/IraqMap';
 import MapLayerControl from '../components/MapLayerControl';
 import KpiCustomizer from '../components/KpiCustomizer';
 import DateRangeFilter from '../components/DateRangeFilter';
-import { KPI_CATALOG, kpiById } from '../lib/kpiCatalog';
+import { getEffectiveKpiCatalog } from '../lib/kpiCatalog';
 import { buildInsights } from '../lib/insights';
 import {
   Users, Truck, AlertOctagon, BarChart3, Map, Activity,
@@ -22,19 +22,29 @@ type ViewMode = 'command' | 'ops' | 'analytics';
 
 const GOVERNORATE_COLORS = ['#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#8B5CF6', '#F97316', '#06B6D4', '#EC4899', '#84CC16', '#FBBF24', '#A78BFA', '#34D399', '#F87171', '#FB923C', '#FB7185'];
 
-function computeAggregates(reports: any[], officeIds: string[]) {
+function computeAggregates(reports: any[], officeIds: string[], extraKeys: string[] = []): Record<string, number> {
   const filt = officeIds.length === 0 ? reports : reports.filter(r => officeIds.includes(r.officeId));
-  return filt.reduce((acc, r) => ({
-    visitors: acc.visitors + (r.visitorsIn || 0) + (r.visitorsOut || 0),
-    vehicles: acc.vehicles + (r.vehiclesCount || 0),
-    processions: acc.processions + (r.processionsCount || 0),
-    deaths: acc.deaths + (r.deathsCount || 0),
-    violations: acc.violations + (r.violationsCount || 0),
-    events: acc.events + (r.eventsCount || 0),
-    incidents: acc.incidents + (r.incidentsCount || 0),
-    resources: acc.resources + (r.resourcesDistributed || 0),
-    deployment: acc.deployment + (r.deploymentCount || 0),
-  }), { visitors: 0, vehicles: 0, processions: 0, deaths: 0, violations: 0, events: 0, incidents: 0, resources: 0, deployment: 0 });
+  const base: Record<string, number> = { visitors: 0, vehicles: 0, processions: 0, deaths: 0, violations: 0, events: 0, incidents: 0, resources: 0, deployment: 0 };
+  for (const k of extraKeys) base[`x:${k}`] = 0;
+  for (const r of filt) {
+    base.visitors    += (r.visitorsIn || 0) + (r.visitorsOut || 0);
+    base.vehicles    += r.vehiclesCount || 0;
+    base.processions += r.processionsCount || 0;
+    base.deaths      += r.deathsCount || 0;
+    base.violations  += r.violationsCount || 0;
+    base.events      += r.eventsCount || 0;
+    base.incidents   += r.incidentsCount || 0;
+    base.resources   += r.resourcesDistributed || 0;
+    base.deployment  += r.deploymentCount || 0;
+    // Sum admin-added numeric fields stored in extra_fields jsonb.
+    if (r.extraFields) {
+      for (const k of extraKeys) {
+        const v = Number(r.extraFields[k]);
+        if (!isNaN(v)) base[`x:${k}`] += v;
+      }
+    }
+  }
+  return base;
 }
 
 export default function DashboardPage() {
