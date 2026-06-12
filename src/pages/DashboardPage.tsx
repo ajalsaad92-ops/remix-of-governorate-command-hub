@@ -7,7 +7,7 @@ import IraqMap from '../components/IraqMap';
 import MapLayerControl from '../components/MapLayerControl';
 import KpiCustomizer from '../components/KpiCustomizer';
 import DateRangeFilter from '../components/DateRangeFilter';
-import { KPI_CATALOG, kpiById } from '../lib/kpiCatalog';
+import { getEffectiveKpiCatalog } from '../lib/kpiCatalog';
 import { buildInsights } from '../lib/insights';
 import {
   Users, Truck, AlertOctagon, BarChart3, Map, Activity,
@@ -22,19 +22,29 @@ type ViewMode = 'command' | 'ops' | 'analytics';
 
 const GOVERNORATE_COLORS = ['#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#8B5CF6', '#F97316', '#06B6D4', '#EC4899', '#84CC16', '#FBBF24', '#A78BFA', '#34D399', '#F87171', '#FB923C', '#FB7185'];
 
-function computeAggregates(reports: any[], officeIds: string[]) {
+function computeAggregates(reports: any[], officeIds: string[], extraKeys: string[] = []): Record<string, number> {
   const filt = officeIds.length === 0 ? reports : reports.filter(r => officeIds.includes(r.officeId));
-  return filt.reduce((acc, r) => ({
-    visitors: acc.visitors + (r.visitorsIn || 0) + (r.visitorsOut || 0),
-    vehicles: acc.vehicles + (r.vehiclesCount || 0),
-    processions: acc.processions + (r.processionsCount || 0),
-    deaths: acc.deaths + (r.deathsCount || 0),
-    violations: acc.violations + (r.violationsCount || 0),
-    events: acc.events + (r.eventsCount || 0),
-    incidents: acc.incidents + (r.incidentsCount || 0),
-    resources: acc.resources + (r.resourcesDistributed || 0),
-    deployment: acc.deployment + (r.deploymentCount || 0),
-  }), { visitors: 0, vehicles: 0, processions: 0, deaths: 0, violations: 0, events: 0, incidents: 0, resources: 0, deployment: 0 });
+  const base: Record<string, number> = { visitors: 0, vehicles: 0, processions: 0, deaths: 0, violations: 0, events: 0, incidents: 0, resources: 0, deployment: 0 };
+  for (const k of extraKeys) base[`x:${k}`] = 0;
+  for (const r of filt) {
+    base.visitors    += (r.visitorsIn || 0) + (r.visitorsOut || 0);
+    base.vehicles    += r.vehiclesCount || 0;
+    base.processions += r.processionsCount || 0;
+    base.deaths      += r.deathsCount || 0;
+    base.violations  += r.violationsCount || 0;
+    base.events      += r.eventsCount || 0;
+    base.incidents   += r.incidentsCount || 0;
+    base.resources   += r.resourcesDistributed || 0;
+    base.deployment  += r.deploymentCount || 0;
+    // Sum admin-added numeric fields stored in extra_fields jsonb.
+    if (r.extraFields) {
+      for (const k of extraKeys) {
+        const v = Number(r.extraFields[k]);
+        if (!isNaN(v)) base[`x:${k}`] += v;
+      }
+    }
+  }
+  return base;
 }
 
 export default function DashboardPage() {
@@ -54,13 +64,16 @@ export default function DashboardPage() {
 
   // Apply date-range when set; else use today (cumulative-today behavior).
   const { aggToday, aggYesterday, rangeLabel } = useMemo(() => {
+    const extraKeys = state.fieldDefinitions
+      .filter(f => f.countInStats && !f.isBuiltIn && f.fieldType === 'number' && !f.isHidden)
+      .map(f => f.fieldKey);
     const dr = state.dateRange;
     if (!dr) {
       const yest = new Date(); yest.setDate(yest.getDate() - 1);
       const yestStr = yest.toISOString().slice(0, 10);
       return {
-        aggToday: computeAggregates(state.todayReports, effectiveFilter),
-        aggYesterday: computeAggregates(state.historicalReports.filter(r => r.reportDate === yestStr), effectiveFilter),
+        aggToday: computeAggregates(state.todayReports, effectiveFilter, extraKeys),
+        aggYesterday: computeAggregates(state.historicalReports.filter(r => r.reportDate === yestStr), effectiveFilter, extraKeys),
         rangeLabel: 'اليوم',
       };
     }
@@ -75,11 +88,11 @@ export default function DashboardPage() {
     const prevToStr = prevTo.toISOString().slice(0, 10);
     const prev = all.filter(r => r.reportDate >= prevFromStr && r.reportDate <= prevToStr);
     return {
-      aggToday: computeAggregates(inRange, effectiveFilter),
-      aggYesterday: computeAggregates(prev, effectiveFilter),
+      aggToday: computeAggregates(inRange, effectiveFilter, extraKeys),
+      aggYesterday: computeAggregates(prev, effectiveFilter, extraKeys),
       rangeLabel: dr.from === dr.to ? dr.from : `${dr.from} → ${dr.to}`,
     };
-  }, [state.dateRange, state.todayReports, state.historicalReports, effectiveFilter]);
+  }, [state.dateRange, state.todayReports, state.historicalReports, effectiveFilter, state.fieldDefinitions]);
 
   const trend = (today: number, yest: number) => yest === 0 ? 0 : ((today - yest) / yest) * 100;
   const activeEmergencies = state.emergencies.filter(e => e.status === 'active').length;
@@ -812,13 +825,15 @@ function DrillDownPanel({ office, onClose }: { office: Office; onClose: () => vo
 function CustomKpiGrid({ agg, aggYesterday, trend, activeEmergencies, cols = 3 }: any) {
   const { state } = useOps();
   const ids = state.customKpis;
+  const catalog = getEffectiveKpiCatalog(state.fieldDefinitions);
+  const byId = (id: string) => catalog.find(k => k.id === id);
   const valFor = (id: string) => id === 'emergencies' ? activeEmergencies : (agg as any)[id] || 0;
   const yestFor = (id: string) => id === 'emergencies' ? activeEmergencies : (aggYesterday as any)[id] || 0;
   const colsCls = cols === 4 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3';
   return (
     <div className={`grid ${colsCls} gap-3`}>
       {ids.map((id: string) => {
-        const def = kpiById(id);
+        const def = byId(id);
         if (!def) return null;
         return (
           <KpiCard
@@ -842,6 +857,8 @@ function CustomKpiGrid({ agg, aggYesterday, trend, activeEmergencies, cols = 3 }
 function OpsKpiOverlay({ agg, activeEmergencies }: any) {
   const { state } = useOps();
   const ids = state.customKpis;
+  const catalog = getEffectiveKpiCatalog(state.fieldDefinitions);
+  const byId = (id: string) => catalog.find(k => k.id === id);
   const toneClass: Record<string, string> = {
     amber: 'from-amber-400 to-orange-600',
     blue: 'from-blue-400 to-indigo-600',
@@ -858,7 +875,7 @@ function OpsKpiOverlay({ agg, activeEmergencies }: any) {
   return (
     <>
       {ids.map((id: string) => {
-        const def = kpiById(id);
+        const def = byId(id);
         if (!def) return null;
         const v = id === 'emergencies' ? activeEmergencies : (agg as any)[id] || 0;
         const isEmergency = id === 'emergencies' && v > 0;
@@ -920,5 +937,3 @@ function SmartInsightsTicker({ insights }: { insights: ReturnType<typeof buildIn
   );
 }
 
-// Reference unused imports for type safety
-void KPI_CATALOG;

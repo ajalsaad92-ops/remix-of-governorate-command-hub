@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useOps } from '../store/opsStore';
-import { KPI_CATALOG } from '../lib/kpiCatalog';
+import { getEffectiveKpiCatalog } from '../lib/kpiCatalog';
 import { Settings, Check, X } from 'lucide-react';
 
 export default function KpiCustomizer() {
   const { state, dispatch } = useOps();
   const [open, setOpen] = useState(false);
   const selected = state.customKpis;
+  const catalog = getEffectiveKpiCatalog(state.fieldDefinitions);
 
   const toggle = (id: string) => {
     const next = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
@@ -34,7 +35,7 @@ export default function KpiCustomizer() {
               <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
             </div>
             <div className="max-h-80 overflow-y-auto p-1">
-              {KPI_CATALOG.map(k => {
+              {catalog.map(k => {
                 const on = selected.includes(k.id);
                 const Icon = k.icon;
                 return (

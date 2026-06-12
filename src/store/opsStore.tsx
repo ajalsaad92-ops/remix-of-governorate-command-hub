@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useReducer, useRef, useState, typ
 import type {
   Profile, DailyReport, Emergency, ExtensionRequest,
   AgentLocation, VisitorFlowPath, TimeWindow, TimeWindowStatus,
+  ReportFieldGroup, ReportFieldDefinition,
 } from '../data/types';
 import { api } from '../lib/api';
 import { isSupabaseConfigured } from '../integrations/supabase/client';
@@ -26,6 +27,8 @@ interface OpsState {
   agentLocations: AgentLocation[];
   flowPaths: VisitorFlowPath[];
   borderCrossings: any[];
+  fieldGroups: ReportFieldGroup[];
+  fieldDefinitions: ReportFieldDefinition[];
 
   // UI
   selectedOfficeId: string | null;
@@ -50,6 +53,7 @@ type Action =
   | { type: 'SET_LOADING'; key: string; loading: boolean }
   | { type: 'SET_ERROR'; key: string; error: string | null }
   | { type: 'SET_DATA'; users?: Profile[]; todayReports?: DailyReport[]; historicalReports?: DailyReport[]; emergencies?: Emergency[]; extensions?: ExtensionRequest[]; agentLocations?: AgentLocation[]; flowPaths?: VisitorFlowPath[]; borderCrossings?: any[]; timeWindow?: TimeWindow }
+  | { type: 'SET_FIELD_DEFS'; groups: ReportFieldGroup[]; definitions: ReportFieldDefinition[] }
   | { type: 'SET_SERVER_TIME'; time: Date }
   | { type: 'SET_TIME_WINDOW'; window: Partial<TimeWindow> }
   | { type: 'FORCE_OPEN_WINDOW' }
@@ -90,6 +94,8 @@ const initialState: OpsState = {
   agentLocations: [],
   flowPaths: [],
   borderCrossings: [],
+  fieldGroups: [],
+  fieldDefinitions: [],
   selectedOfficeId: null,
   activeMapLayers: new Set(['offices', 'borderCrossings', 'agentGPS']),
   officeFilter: [],
@@ -149,6 +155,8 @@ function reducer(state: OpsState, action: Action): OpsState {
         borderCrossings: action.borderCrossings ?? state.borderCrossings,
         timeWindow: action.timeWindow ?? state.timeWindow,
       };
+    case 'SET_FIELD_DEFS':
+      return { ...state, fieldGroups: action.groups, fieldDefinitions: action.definitions };
     case 'SET_SERVER_TIME': {
       const status = computeTimeWindowStatus(action.time, state.timeWindow);
       return { ...state, serverTime: action.time, timeWindowStatus: status };
@@ -299,6 +307,23 @@ const actions = {
   async seedDemoData() {
     return api.seedDemoData();
   },
+  async reloadFieldDefs(dispatch?: React.Dispatch<Action>) {
+    const [groups, definitions] = await Promise.all([api.getFieldGroups(), api.getFieldDefinitions()]);
+    dispatch?.({ type: 'SET_FIELD_DEFS', groups, definitions });
+    return { groups, definitions };
+  },
+  async upsertFieldGroup(g: Partial<ReportFieldGroup> & { titleAr: string }) {
+    return api.upsertFieldGroup(g);
+  },
+  async deleteFieldGroup(id: string) {
+    return api.deleteFieldGroup(id);
+  },
+  async upsertFieldDefinition(f: Partial<ReportFieldDefinition> & { fieldKey: string; labelAr: string; groupId: string }) {
+    return api.upsertFieldDefinition(f);
+  },
+  async deleteFieldDefinition(id: string) {
+    return api.deleteFieldDefinition(id);
+  },
 };
 
 export function OpsProvider({ children }: { children: ReactNode }) {
@@ -326,6 +351,12 @@ export function OpsProvider({ children }: { children: ReactNode }) {
         ]);
         dispatch({ type: 'SET_DATA', users, todayReports, historicalReports, emergencies, extensions, agentLocations, flowPaths, borderCrossings, timeWindow });
         dispatch({ type: 'SET_SERVER_TIME', time: serverTime });
+        // Load dynamic report-field definitions in parallel; fail silently
+        // so a permission issue doesn't block the rest of the dashboard.
+        try {
+          const [fg, fd] = await Promise.all([api.getFieldGroups(), api.getFieldDefinitions()]);
+          dispatch({ type: 'SET_FIELD_DEFS', groups: fg, definitions: fd });
+        } catch (e) { console.warn('[opsStore] field defs load failed', e); }
         if (user) dispatch({ type: 'AUTH_SUCCESS', user });
         else dispatch({ type: 'AUTH_FAIL' });
       } catch (e) {

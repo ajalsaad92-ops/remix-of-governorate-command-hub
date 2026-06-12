@@ -58,6 +58,8 @@ export interface DailyReport {
   reporterLat?: number;
   reporterLng?: number;
   mgrsReference?: string;
+  /** Free-form values for dynamically added (non-built-in) fields. */
+  extraFields?: Record<string, any>;
 }
 
 export interface ExtensionRequest {
@@ -123,3 +125,33 @@ export interface TimeWindow {
 }
 
 export type TimeWindowStatus = 'closed' | 'open' | 'pre_warning' | 'locked';
+
+// ─── Dynamic report-field definitions (admin-editable) ───────────────
+export type ReportFieldType =
+  | 'number' | 'text' | 'textarea'
+  | 'location' | 'multi_location' | 'route'
+  | 'date' | 'time';
+
+export interface ReportFieldGroup {
+  id: string;
+  titleAr: string;
+  sortOrder: number;
+  isHidden: boolean;
+}
+
+export interface ReportFieldDefinition {
+  id: string;
+  groupId: string;
+  fieldKey: string;
+  labelAr: string;
+  descriptionAr?: string | null;
+  placeholderAr?: string | null;
+  fieldType: ReportFieldType;
+  sortOrder: number;
+  maxLength?: number | null;
+  isHidden: boolean;
+  isBuiltIn: boolean;
+  countInStats: boolean;
+  statLabelAr?: string | null;
+  allowedUserIds: string[]; // empty = visible to all
+}

@@ -9,6 +9,7 @@ import ReportPage from './pages/ReportPage';
 import EmergencyPage from './pages/EmergencyPage';
 import HistoryPage from './pages/HistoryPage';
 import AdminPage from './pages/AdminPage';
+import ReportFieldsPage from './pages/ReportFieldsPage';
 import SupervisorPanelPage from './pages/SupervisorPanelPage';
 import { useEffect, useState } from 'react';
 import { ToastPermissions } from './components/ToastPermissions';
@@ -52,6 +53,7 @@ function AnimatedRoutes() {
         <Route path="/emergency" element={<EmergencyPage />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/report-fields" element={<ProtectedRoute roles={['director','supervisor']}><ReportFieldsPage /></ProtectedRoute>} />
         <Route path="/supervisor-panel" element={<SupervisorPanelPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
