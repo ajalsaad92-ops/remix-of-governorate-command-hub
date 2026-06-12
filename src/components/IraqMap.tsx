@@ -415,6 +415,57 @@ export default function IraqMap({ onSelectOffice, selectedOfficeId, height = '10
           <Marker key={`p-${r.id}-${i}`} position={[c.lat, c.lng]} icon={procIcon} />
         )))}
 
+        {/* ── Custom (admin-added) location & route fields from extraFields ── */}
+        {(() => {
+          const defs = state.fieldDefinitions.filter(f => !f.isBuiltIn && !f.isHidden);
+          const locDefs   = defs.filter(f => f.fieldType === 'location' || f.fieldType === 'multi_location');
+          const routeDefs = defs.filter(f => f.fieldType === 'route');
+          const out: any[] = [];
+          for (const r of state.todayReports) {
+            const ex = (r as any).extraFields;
+            if (!ex) continue;
+            if (layers.has('events')) {
+              for (const f of locDefs) {
+                const v = ex[f.fieldKey];
+                if (!v) continue;
+                const pts = Array.isArray(v) ? v : [v];
+                pts.forEach((p: any, i: number) => {
+                  if (p && typeof p.lat === 'number' && typeof p.lng === 'number') {
+                    out.push(
+                      <Marker key={`xL-${r.id}-${f.id}-${i}`} position={[p.lat, p.lng]} icon={eventIcon}>
+                        <Popup>
+                          <div className="text-right font-tajawal" dir="rtl" style={{ minWidth: 160 }}>
+                            <div className="font-bold text-blue-600 text-xs mb-1">{f.labelAr}</div>
+                            <div className="text-[10px] text-slate-500">{officeById(r.officeId)?.nameAr}</div>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    );
+                  }
+                });
+              }
+            }
+            if (layers.has('flowPaths')) {
+              for (const f of routeDefs) {
+                const v = ex[f.fieldKey];
+                if (!Array.isArray(v) || v.length < 2) continue;
+                const positions = v
+                  .filter((p: any) => p && typeof p.lat === 'number' && typeof p.lng === 'number')
+                  .map((p: any) => [p.lat, p.lng] as [number, number]);
+                if (positions.length < 2) continue;
+                out.push(
+                  <Polyline
+                    key={`xR-${r.id}-${f.id}`}
+                    positions={positions}
+                    pathOptions={{ color: '#22D3EE', weight: 4, opacity: 0.85 }}
+                  />
+                );
+              }
+            }
+          }
+          return out;
+        })()}
+
         {/* Agent GPS */}
         {layers.has('agentGPS') && state.agentLocations.map(agent => {
           const minutesAgo = (Date.now() - new Date(agent.updatedAt).getTime()) / 60000;

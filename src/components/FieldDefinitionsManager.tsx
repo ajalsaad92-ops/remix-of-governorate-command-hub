@@ -61,11 +61,10 @@ export default function FieldDefinitionsManager() {
   };
 
   const deleteField = async (f: ReportFieldDefinition) => {
-    if (f.isBuiltIn) {
-      toast.error('لا يمكن حذف الحقول الأساسية — أخفِها بدلاً من ذلك');
-      return;
-    }
-    if (!confirm(`حذف الحقل «${f.labelAr}» نهائياً؟`)) return;
+    const msg = f.isBuiltIn
+      ? `«${f.labelAr}» حقل أساسي ومرتبط بالإحصائيات والخريطة. حذفه نهائياً قد يؤثر على بيانات سابقة — يُفضّل إخفاؤه. هل أنت متأكد من الحذف؟`
+      : `حذف الحقل «${f.labelAr}» نهائياً؟`;
+    if (!confirm(msg)) return;
     try {
       await actions.deleteFieldDefinition(f.id);
       await refresh();
@@ -158,11 +157,9 @@ export default function FieldDefinitionsManager() {
                         <button onClick={() => { setEditingField(f); setCreatingInGroup(null); }} className="p-1.5 rounded hover:bg-[#1E293B] text-slate-300" title="تعديل">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        {!f.isBuiltIn && (
-                          <button onClick={() => deleteField(f)} className="p-1.5 rounded hover:bg-red-500/10 text-red-400" title="حذف">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button onClick={() => deleteField(f)} className="p-1.5 rounded hover:bg-red-500/10 text-red-400" title={f.isBuiltIn ? 'حذف (حقل أساسي — يُفضّل الإخفاء)' : 'حذف'}>
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     );
                   })}
@@ -316,12 +313,10 @@ function FieldEditor({ initial, groupId, users, onCancel, onSaved }: any) {
               <button
                 key={t}
                 onClick={() => setFieldType(t)}
-                disabled={isBuiltIn}
-                title={isBuiltIn ? 'لا يمكن تغيير نوع الحقول الأساسية' : ''}
                 className={`p-2 rounded-md text-[11px] flex flex-col items-center gap-1 border transition-colors ${
                   active ? 'border-amber-500/60 bg-amber-500/15 text-amber-300' :
                   'border-[#1E293B] bg-[#0B0F19] text-slate-400 hover:border-[#263244]'
-                } ${isBuiltIn ? 'opacity-60 cursor-not-allowed' : ''}`}
+                }`}
               >
                 <Tn className="w-4 h-4" />
                 {Tm.label}
